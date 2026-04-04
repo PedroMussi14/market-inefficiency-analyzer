@@ -5,25 +5,27 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-SPORT = "basketball_nba"
-REGIONS = "us"
-MARKETS = "h2h"
-ODDS_FORMAT = "american"
 
-def get_odds():
-    url = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds"
+
+def get_sports():
+    url = "https://api.the-odds-api.com/v4/sports"
+    params = {"apiKey": API_KEY}
+
+    response = requests.get(url, params=params, timeout=20)
+    response.raise_for_status()
+    return response.json()
+
+
+def get_odds(sport="basketball_nba", markets="h2h", regions="us", odds_format="american"):
+    url = f"https://api.the-odds-api.com/v4/sports/{sport}/odds"
 
     params = {
         "apiKey": API_KEY,
-        "regions": REGIONS,
-        "markets": MARKETS,
-        "oddsFormat": ODDS_FORMAT,
+        "regions": regions,
+        "markets": markets,
+        "oddsFormat": odds_format,
     }
 
-    response = requests.get(url, params=params)
-
-    if response.status_code != 200:
-        print("Error:", response.status_code, response.text)
-        return []
-
+    response = requests.get(url, params=params, timeout=20)
+    response.raise_for_status()
     return response.json()

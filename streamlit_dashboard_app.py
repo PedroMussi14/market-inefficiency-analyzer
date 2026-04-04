@@ -1,126 +1,286 @@
 import pandas as pd
 import streamlit as st
 
-from api_client import get_odds
+from api_client import get_odds, get_sports
 from arbitrage import analyze_event
 from exporter import analyses_to_dataframe
 
 st.set_page_config(page_title="Market Inefficiency Analyzer", layout="wide")
 
 
-@st.cache_data(ttl=60)
-def load_data(bankroll: float) -> tuple[list[dict], pd.DataFrame]:
-    events = get_odds()
-    all_analyses = []
+@st.cache_data(ttl=300)
+def load_sports():
+    sports = get_sports()
+    return {sport["title"]: sport["key"] for sport in sports}
 
+
+@st.cache_data(ttl=60)
+def load_data(sport_key: str, market: str, region: str, bankroll: float):
+    events = get_odds(
+        sport=sport_key,
+        markets=market,
+        regions=region,
+        odds_format="american",
+    )
+
+    all_analyses = []
     for event in events:
         analysis = analyze_event(event, bankroll)
         if analysis is not None:
             all_analyses.append(analysis)
 
-    df = analyses_to_dataframe(all_analyses)
-    return all_analyses, df
+    detail_df = analyses_to_dataframe(all_analyses)
+    event_df = summarize_by_event(all_analyses)
+    return all_analyses, detail_df, event_df
 
 
-def summarize_by_event(all_analyses: list[dict]) -> pd.DataFrame:
+def summarize_by_event(all_analyses):
     rows = []
     for analysis in all_analyses:
         rows.append({
-            "event": analysis["event"],
-            "sport": analysis["sport"],
-            "commence_time": analysis["commence_time"],
-            "implied_prob_sum": round(analysis["implied_prob_sum"], 4),
-            "arbitrage": analysis["arbitrage"],
-            "profit": round(analysis["profit"], 2) if analysis["profit"] is not None else None,
-            "roi": round(analysis["roi"], 2) if analysis["roi"] is not None else None,
+            "Event": analysis["event"],
+            "Sport": analysis["sport"],
+            "Start Time": analysis["commence_time"],
+            "Implied Probability": round(analysis["implied_prob_sum"], 4),
+            "Arbitrage Found": "Yes" if analysis["arbitrage"] else "No",
+            "Profit ($)": round(analysis["profit"], 2) if analysis["profit"] is not None else None,
+            "ROI (%)": round(analysis["roi"], 2) if analysis["roi"] is not None else None,
         })
     return pd.DataFrame(rows)
 
 
+def format_market_label(market_key: str) -> str:
+    labels = {
+        "h2h": "Moneyline / Match Winner",
+        "spreads": "Point Spread",
+        "totals": "Game Total",
+    }
+    return labels.get(market_key, market_key)
+
+
+def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
+    display_df = df.copy()
+    rename_map = {
+        "event": "Event",
+        "sport": "Sport",
+        "commence_time": "Start Time",
+        "implied_prob_sum": "Implied Probability",
+        "arbitrage": "Arbitrage Found",
+        "profit": "Profit ($)",
+        "roi": "ROI (%)",
+        "outcome": "Outcome",
+        "bookmaker": "Sportsbook",
+        "american_odds": "American Odds",
+        "decimal_odds": "Decimal Odds",
+        "stake": "Suggested Stake ($)",
+    }
+    display_df = display_df.rename(columns=rename_map)
+
+    if "Arbitrage Found" in display_df.columns:
+        display_df["Arbitrage Found"] = display_df["Arbitrage Found"].map({True: "Yes", False: "No"})
+
+    for col in ["Implied Probability", "Profit ($)", "ROI (%)", "Decimal Odds", "Suggested Stake ($)"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].round(4 if col in ["Implied Probability", "Decimal Odds"] else 2)
+
+    return display_df
+
+
 st.title("Market Inefficiency Analyzer")
-st.caption("Live odds dashboard with arbitrage detection and near-arbitrage ranking")
+st.caption("Finds the best sportsbook price for each side of a game and checks whether a low-risk arbitrage setup exists.")
+
+available_sports = load_sports()
+common_sports = [
+    "NBA",
+    "NFL",
+    "MLB",
+    "NHL",
+    "English Premier League",
+    "NCAAB",
+    "NCAAF",
+]
+
+sport_options = [sport for sport in common_sports if sport in available_sports]
+remaining_sports = [sport for sport in available_sports if sport not in sport_options]
+sport_options.extend(remaining_sports)
 
 with st.sidebar:
-    st.header("Filters")
-    bankroll = st.number_input("Bankroll per event", min_value=1.0, value=100.0, step=10.0)
-    show_only_arbitrage = st.checkbox("Show only arbitrage opportunities", value=False)
-    max_implied_prob = st.slider("Maximum implied probability sum", min_value=1.00, max_value=1.10, value=1.03, step=0.001)
-    top_n = st.slider("Number of closest markets", min_value=5, max_value=50, value=10, step=5)
-    refresh = st.button("Refresh data")
+    st.header("Choose what to analyze")
+
+    sport_title = st.selectbox(
+        "Sport",
+        sport_options,
+        help="Pick the league you want to scan.",
+    )
+    sport_key = available_sports[sport_title]
+
+    market_display = st.selectbox(
+        "Market type",
+        ["Moneyline / Match Winner", "Point Spread", "Game Total"],
+        help="Moneyline is the easiest place to start.",
+    )
+    market_map = {
+        "Moneyline / Match Winner": "h2h",
+        "Point Spread": "spreads",
+        "Game Total": "totals",
+    }
+    market = market_map[market_display]
+
+    region_display = st.selectbox(
+        "Sportsbook region",
+        ["United States", "United Kingdom", "Europe", "Australia"],
+        index=0,
+    )
+    region_map = {
+        "United States": "us",
+        "United Kingdom": "uk",
+        "Europe": "eu",
+        "Australia": "au",
+    }
+    region = region_map[region_display]
+
+    bankroll = st.number_input(
+        "Budget per game ($)",
+        min_value=1.0,
+        value=100.0,
+        step=10.0,
+        help="Used only to estimate stake sizing and profit.",
+    )
+
+    mode = st.radio(
+        "View",
+        ["Simple", "Advanced"],
+        horizontal=True,
+        help="Simple keeps only the most useful filters visible.",
+    )
+
+    show_only_arbitrage = st.checkbox(
+        "Show only arbitrage opportunities",
+        value=False,
+    )
+
+    if mode == "Advanced":
+        max_implied_prob = st.slider(
+            "Maximum implied probability",
+            min_value=1.00,
+            max_value=1.10,
+            value=1.03,
+            step=0.001,
+            help="Lower values are closer to arbitrage.",
+        )
+        top_n = st.slider(
+            "How many closest games to show",
+            min_value=5,
+            max_value=100,
+            value=25,
+            step=5,
+        )
+    else:
+        max_implied_prob = 1.03
+        top_n = 10
+
+    refresh = st.button("Refresh data", use_container_width=True)
 
 if refresh:
     st.cache_data.clear()
 
-try:
-    all_analyses, detail_df = load_data(bankroll)
-except Exception as e:
-    st.error(f"Error loading API data: {e}")
+with st.spinner("Loading live odds and analyzing markets..."):
+    try:
+        all_analyses, detail_df, event_df = load_data(sport_key, market, region, bankroll)
+    except Exception as e:
+        st.error(f"Error loading API data: {e}")
+        st.stop()
+
+if event_df.empty:
+    st.warning("No complete events were returned by the API for these settings.")
     st.stop()
 
-if detail_df.empty:
-    st.warning("No complete events were returned by the API.")
-    st.stop()
-
-event_df = summarize_by_event(all_analyses)
-
-sports = sorted(event_df["sport"].dropna().unique().tolist())
-selected_sports = st.multiselect("Sport", sports, default=sports)
-
-filtered_event_df = event_df[event_df["sport"].isin(selected_sports)].copy()
-filtered_event_df = filtered_event_df[filtered_event_df["implied_prob_sum"] <= max_implied_prob]
+filtered_event_df = event_df.copy()
+filtered_event_df = filtered_event_df[filtered_event_df["Implied Probability"] <= max_implied_prob]
 
 if show_only_arbitrage:
-    filtered_event_df = filtered_event_df[filtered_event_df["arbitrage"] == True]
+    filtered_event_df = filtered_event_df[filtered_event_df["Arbitrage Found"] == "Yes"]
 
-matching_events = filtered_event_df["event"].tolist()
+matching_events = filtered_event_df["Event"].tolist()
 filtered_detail_df = detail_df[detail_df["event"].isin(matching_events)].copy()
+display_detail_df = format_event_detail(filtered_detail_df)
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Events analyzed", len(event_df))
-col2.metric("Arbitrage opportunities", int(event_df["arbitrage"].sum()))
-col3.metric("Best implied prob.", f"{event_df['implied_prob_sum'].min():.4f}")
-col4.metric("Closest edge", f"{((1 - event_df['implied_prob_sum'].min()) * 100):.2f}%")
+best_implied_prob = float(event_df["Implied Probability"].min())
+arb_count = int((event_df["Arbitrage Found"] == "Yes").sum())
+closest_edge = (1 - best_implied_prob) * 100
 
-st.subheader("Top markets closest to arbitrage")
-closest_df = filtered_event_df.sort_values("implied_prob_sum").head(top_n)
-st.dataframe(closest_df, use_container_width=True)
+st.subheader("Quick summary")
+metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+metric_1.metric("Games analyzed", len(event_df))
+metric_2.metric("Arbitrage found", arb_count)
+metric_3.metric("Closest game", f"{best_implied_prob:.4f}")
+metric_4.metric("Best edge", f"{closest_edge:.2f}%")
 
-arb_df = filtered_event_df[filtered_event_df["arbitrage"] == True].sort_values("roi", ascending=False)
+with st.expander("What do these numbers mean?"):
+    st.write(
+        "A value below 1.00 means a true arbitrage opportunity exists. "
+        "The closer a game is to 1.00, the closer it is to becoming profitable."
+    )
+    st.write(
+        "Suggested stake sizes only appear when an arbitrage opportunity is found."
+    )
+
+st.subheader("Best opportunities right now")
+closest_df = filtered_event_df.sort_values("Implied Probability").head(top_n)
+
+if closest_df.empty:
+    st.info("No games match the current filters.")
+else:
+    st.dataframe(closest_df, use_container_width=True, hide_index=True)
+
+arb_df = filtered_event_df[filtered_event_df["Arbitrage Found"] == "Yes"].sort_values("ROI (%)", ascending=False)
 st.subheader("Profitable arbitrage opportunities")
 if arb_df.empty:
-    st.info("No profitable arbitrage opportunities found in the current API response.")
+    st.info("No profitable arbitrage opportunities were found in this batch.")
 else:
-    st.dataframe(arb_df, use_container_width=True)
+    st.dataframe(arb_df, use_container_width=True, hide_index=True)
 
-st.subheader("Outcome-level detail")
-st.dataframe(filtered_detail_df.sort_values(["event", "decimal_odds"], ascending=[True, False]), use_container_width=True)
+st.subheader("Explore one game")
+if matching_events:
+    selected_event = st.selectbox("Select a game", matching_events)
+    event_rows = display_detail_df[display_detail_df["Event"] == selected_event].copy()
+    event_summary = filtered_event_df[filtered_event_df["Event"] == selected_event].iloc[0]
 
-csv_bytes = filtered_detail_df.to_csv(index=False).encode("utf-8")
+    left, right = st.columns([2, 1])
+
+    with left:
+        st.dataframe(event_rows, use_container_width=True, hide_index=True)
+
+    with right:
+        st.markdown("### Summary")
+        st.write(f"**Sport:** {event_summary['Sport']}")
+        st.write(f"**Market:** {format_market_label(market)}")
+        st.write(f"**Start Time:** {event_summary['Start Time']}")
+        st.write(f"**Implied Probability:** {event_summary['Implied Probability']:.4f}")
+        st.write(f"**Arbitrage Found:** {event_summary['Arbitrage Found']}")
+
+        if pd.notna(event_summary["Profit ($)"]):
+            st.write(f"**Estimated Profit:** ${event_summary['Profit ($)']:.2f}")
+        if pd.notna(event_summary["ROI (%)"]):
+            st.write(f"**Estimated ROI:** {event_summary['ROI (%)']:.2f}%")
+else:
+    st.info("No events match the current filters.")
+
+with st.expander("Show all filtered outcome details"):
+    if display_detail_df.empty:
+        st.info("No detailed rows to show.")
+    else:
+        st.dataframe(
+            display_detail_df.sort_values(["Event", "Decimal Odds"], ascending=[True, False]),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+csv_bytes = display_detail_df.to_csv(index=False).encode("utf-8")
 st.download_button(
     label="Download filtered results as CSV",
     data=csv_bytes,
     file_name="market_analysis_results_filtered.csv",
     mime="text/csv",
+    use_container_width=True,
 )
-
-st.subheader("Event explorer")
-if matching_events:
-    selected_event = st.selectbox("Select an event", matching_events)
-    event_rows = filtered_detail_df[filtered_detail_df["event"] == selected_event]
-    event_summary = filtered_event_df[filtered_event_df["event"] == selected_event].iloc[0]
-
-    left, right = st.columns([2, 1])
-    with left:
-        st.dataframe(event_rows, use_container_width=True)
-    with right:
-        st.markdown("### Summary")
-        st.write(f"**Sport:** {event_summary['sport']}")
-        st.write(f"**Start Time:** {event_summary['commence_time']}")
-        st.write(f"**Implied Probability Sum:** {event_summary['implied_prob_sum']:.4f}")
-        st.write(f"**Arbitrage:** {'Yes' if event_summary['arbitrage'] else 'No'}")
-        if pd.notna(event_summary['profit']):
-            st.write(f"**Profit:** ${event_summary['profit']:.2f}")
-        if pd.notna(event_summary['roi']):
-            st.write(f"**ROI:** {event_summary['roi']:.2f}%")
-else:
-    st.info("No events match the selected filters.")
