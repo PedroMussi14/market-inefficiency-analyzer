@@ -41,6 +41,19 @@ BOOK_LINKS = {
 }
 
 
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 1rem;
+}
+
+section[data-testid="stSidebar"] {
+    width: 300px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 @st.cache_data(ttl=300)
 def load_sports():
     sports = get_sports()
@@ -380,15 +393,28 @@ if matching_games:
     event_rows = display_detail_df[display_detail_df["Game"] == selected_game].copy()
     event_summary = filtered_event_df[filtered_event_df["Game"] == selected_game].iloc[0]
 
-    left, right = st.columns([2, 1])
+    left, right = st.columns([1.2, 1])
 
     with left:
-        simple_cols = ["Bet On", "Sportsbook", "American Odds", "Decimal Odds"]
-        if "Suggested Bet ($)" in event_rows.columns and event_rows["Suggested Bet ($)"].notna().any():
-            simple_cols.append("Suggested Bet ($)")
+        st.markdown("### 📊 Best Prices")
 
-        st.write("Best available prices for this game:")
-        st.dataframe(event_rows[simple_cols], use_container_width=True, hide_index=True)
+        st.dataframe(
+            event_rows[simple_cols],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("---")
+
+        st.markdown("### 💡 Quick Insight")
+
+        if pd.notna(event_summary["Return (%)"]):
+            st.success(
+                f"Expected return: {event_summary['Return (%)']:.2f}% "
+                f"(${event_summary['Profit ($)']:.2f} profit)"
+            )
+        else:
+            st.info("No guaranteed arbitrage opportunity for this game.")
 
     with right:
         st.markdown("### Summary")
