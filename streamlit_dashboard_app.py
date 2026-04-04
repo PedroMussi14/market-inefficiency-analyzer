@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from urllib.parse import quote_plus
 
 from api_client import get_odds, get_sports
 from arbitrage import analyze_event
@@ -8,28 +9,11 @@ from exporter import analyses_to_dataframe
 st.set_page_config(page_title="Best Betting Opportunities", layout="wide")
 
 
-BOOK_LINKS = {
-    "DraftKings": "https://sportsbook.draftkings.com/",
-    "FanDuel": "https://www.fanduel.com/",
-    "BetMGM": "https://sports.betmgm.com/",
-    "BetRivers": "https://betrivers.com/",
-    "Bovada": "https://www.bovada.lv/",
-    "MyBookie.ag": "https://www.mybookie.ag/",
-    "LowVig.ag": "https://www.lowvig.ag/",
-    "BetOnline.ag": "https://www.betonline.ag/",
-    "BetUS": "https://www.betus.com.pa/",
-}
-
-
 @st.cache_data(ttl=300)
 def load_sports():
     sports = get_sports()
 
-    excluded_keywords = [
-        "winner",
-        "outrights",
-        "championship",
-    ]
+    excluded_keywords = ["winner", "outrights", "championship"]
 
     filtered_sports = {}
     for sport in sports:
@@ -56,7 +40,7 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float):
     except Exception as e:
         raise Exception(
             "This sport or market is not supported. Try another option."
-        )
+        ) from e
 
     all_analyses = []
     for event in events:
@@ -119,17 +103,22 @@ def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
     if "Guaranteed Profit" in display_df.columns:
         display_df["Guaranteed Profit"] = display_df["Guaranteed Profit"].map({
             True: "Yes",
-            False: "No"
+            False: "No",
         })
 
     for col in ["Market Efficiency", "Profit ($)", "Return (%)", "Decimal Odds", "Suggested Bet ($)"]:
         if col in display_df.columns:
             if col in ["Market Efficiency", "Decimal Odds"]:
-                display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(4).fillna("")
+                display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(4)
             else:
-                display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(2).fillna("")
+                display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(2)
 
     return display_df
+
+
+def build_game_info_link(game_name: str) -> str:
+    query = quote_plus(game_name + " ESPN")
+    return f"https://www.google.com/search?q={query}"
 
 
 st.title("Best Betting Opportunities")
@@ -202,7 +191,7 @@ with st.sidebar:
             max_value=1.10,
             value=1.03,
             step=0.001,
-            help="Closer to 1.00 means better pricing."
+            help="Closer to 1.00 means better pricing.",
         )
         top_n = st.slider(
             "How many games to show",
@@ -257,14 +246,14 @@ with st.expander("How to read this page"):
     )
     st.write(
         "The most important numbers are the game, the return percentage, the profit, "
-        "and the sportsbook to use."
+        "and the sportsbook with the best price."
     )
 
 arb_df = filtered_event_df[filtered_event_df["Guaranteed Profit"] == "Yes"].sort_values(
     "Return (%)", ascending=False
 )
 
-st.subheader("Top Games to Bet Right Now")
+st.subheader("Top Games Right Now")
 
 if arb_df.empty:
     closest_df = filtered_event_df.sort_values("Market Efficiency").head(top_n)
@@ -285,10 +274,15 @@ else:
             f"Estimated profit: **${best['Profit ($)']:.2f}**"
         )
 
-st.subheader("How to Bet This Game")
+st.subheader("Game Breakdown")
 
 if matching_games:
-    preferred_games = arb_df["Game"].tolist() if not arb_df.empty else filtered_event_df.sort_values("Market Efficiency")["Game"].tolist()
+    preferred_games = (
+        arb_df["Game"].tolist()
+        if not arb_df.empty
+        else filtered_event_df.sort_values("Market Efficiency")["Game"].tolist()
+    )
+
     selected_game = st.selectbox("Select a game", preferred_games)
 
     event_rows = display_detail_df[display_detail_df["Game"] == selected_game].copy()
@@ -301,7 +295,7 @@ if matching_games:
         if "Suggested Bet ($)" in event_rows.columns and event_rows["Suggested Bet ($)"].notna().any():
             simple_cols.append("Suggested Bet ($)")
 
-        st.write("Place these bets:")
+        st.write("Best available prices for this game:")
         st.dataframe(event_rows[simple_cols], use_container_width=True, hide_index=True)
 
     with right:
@@ -312,19 +306,20 @@ if matching_games:
         st.write(f"**Guaranteed Profit:** {event_summary['Guaranteed Profit']}")
 
         if pd.notna(event_summary["Profit ($)"]):
-            st.write(f"**Estimated Profit:** ${event_summary['Profit ($)']:.2f}")
+            st.write(f"**Estimated Profit on ${bankroll:.0f}:** ${event_summary['Profit ($)']:.2f}")
 
         if pd.notna(event_summary["Return (%)"]):
             st.write(f"**Expected Return:** {event_summary['Return (%)']:.2f}%")
 
+        st.markdown("### Learn more")
+        game_info_link = build_game_info_link(selected_game)
+        st.markdown(f"[Open matchup info and news]({game_info_link})")
+
         sportsbooks_used = event_rows["Sportsbook"].dropna().unique().tolist()
         if sportsbooks_used:
-            st.markdown("### Sportsbook links")
+            st.markdown("### Best prices found at")
             for book in sportsbooks_used:
-                if book in BOOK_LINKS:
-                    st.markdown(f"[Open {book}]({BOOK_LINKS[book]})")
-                else:
-                    st.write(book)
+                st.write(f"- {book}")
 else:
     st.info("No games match the current filters.")
 
