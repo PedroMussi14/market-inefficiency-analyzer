@@ -1,4 +1,8 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0248,False,,,Denver Nuggets,DraftKings,114,2.14
-Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0267,False,,,Washington Wizards,DraftKings,1100,12.0
-Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0,False,,,Philadelphia 76ers,LowVig.ag,117,2.17
+San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0233,False,,,Denver Nuggets,FanDuel,112,2.12
+Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0238,False,,,Washington Wizards,FanDuel,1300,14.0
+Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0278,False,,,Philadelphia 76ers,LowVig.ag,132,2.32
+Charlotte Hornets vs Minnesota Timberwolves,NBA,2026-04-05T23:10:00Z,1.0157,False,,,Charlotte Hornets,FanDuel,108,2.08
+Orlando Magic vs New Orleans Pelicans,NBA,2026-04-05T23:10:00Z,1.0134,False,,,New Orleans Pelicans,DraftKings,140,2.4
+Utah Jazz vs Oklahoma City Thunder,NBA,2026-04-05T23:10:00Z,1.0233,False,,,Utah Jazz,DraftKings,1700,18.0
+Los Angeles Clippers vs Sacramento Kings,NBA,2026-04-06T01:10:00Z,1.0266,False,,,Sacramento Kings,FanDuel,490,5.9
