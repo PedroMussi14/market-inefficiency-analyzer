@@ -1,6 +1,10 @@
 from api_client import get_odds
 from arbitrage import analyze_event
-from exporter import export_to_csv
+from exporter import (
+    analyses_to_dataframe,
+    export_detailed_csv,
+    export_summary_csv,
+)
 
 
 def print_divider():
@@ -47,8 +51,13 @@ def main():
         if analysis is not None:
             all_analyses.append(analysis)
 
-    df = export_to_csv("market_analysis_results.csv", all_analyses)
-    print("Results exported to market_analysis_results.csv")
+    # Export both CSV versions
+    export_detailed_csv("detailed.csv", all_analyses)
+    export_summary_csv("summary.csv", all_analyses)
+    print("Results exported to detailed.csv and summary.csv")
+
+    # Create DataFrame for optional preview
+    df = analyses_to_dataframe(all_analyses)
 
     arbitrage_opportunities = [a for a in all_analyses if a["arbitrage"]]
     closest_opportunities = sorted(all_analyses, key=lambda x: x["implied_prob_sum"])
@@ -75,7 +84,10 @@ def main():
         print_event(analysis)
 
     print("\nPANDAS SUMMARY")
-    print(df.head())
+    if df.empty:
+        print("No rows to display.")
+    else:
+        print(df.head())
 
 
 if __name__ == "__main__":

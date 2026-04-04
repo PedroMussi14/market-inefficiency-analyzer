@@ -1,11 +1,45 @@
 import pandas as pd
 import streamlit as st
-from urllib.parse import quote_plus
 
+from urllib.parse import quote_plus
 from api_client import get_odds, get_sports
 from arbitrage import analyze_event
-from exporter import analyses_to_dataframe
+from exporter import (
+    analyses_to_dataframe,
+    export_detailed_csv,
+    export_summary_csv,
+)
 
+
+BOOK_LINKS = {
+    # 🇺🇸 US major sportsbooks
+    "DraftKings": "https://sportsbook.draftkings.com/",
+    "FanDuel": "https://sportsbook.fanduel.com/",
+    "BetMGM": "https://sports.betmgm.com/",
+    "Caesars": "https://sportsbook.caesars.com/",
+    "BetRivers": "https://www.betrivers.com/",
+    "PointsBet": "https://pointsbet.com/",
+    "Barstool": "https://barstoolsportsbook.com/",
+    "Hard Rock Bet": "https://www.hardrock.bet/",
+    "ESPN BET": "https://espnbet.com/",
+    "Fanatics": "https://sportsbook.fanatics.com/",
+
+    # 🌍 International well-known sportsbooks
+    "Bet365": "https://www.bet365.com/",
+    "William Hill": "https://www.williamhill.com/",
+    "888sport": "https://www.888sport.com/",
+    "Unibet": "https://www.unibet.com/",
+    "Pinnacle": "https://www.pinnacle.com/",
+    "Betway": "https://www.betway.com/",
+    "LeoVegas": "https://www.leovegas.com/",
+    "Coral": "https://sports.coral.co.uk/",
+    "Ladbrokes": "https://sports.ladbrokes.com/",
+
+    # 🌐 Offshore / others (already in your data)
+    "Bovada": "https://www.bovada.lv/",
+    "MyBookie.ag": "https://www.mybookie.ag/",
+    "LowVig.ag": "https://www.lowvig.ag/",
+}
 st.set_page_config(page_title="Best Betting Opportunities", layout="wide")
 
 
@@ -100,12 +134,6 @@ def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
 
     display_df = display_df.rename(columns=rename_map)
 
-    if "Guaranteed Profit" in display_df.columns:
-        display_df["Guaranteed Profit"] = display_df["Guaranteed Profit"].map({
-            True: "Yes",
-            False: "No",
-        })
-
     for col in ["Market Efficiency", "Profit ($)", "Return (%)", "Decimal Odds", "Suggested Bet ($)"]:
         if col in display_df.columns:
             if col in ["Market Efficiency", "Decimal Odds"]:
@@ -120,6 +148,26 @@ def build_game_info_link(game_name: str) -> str:
     query = quote_plus(game_name + " ESPN")
     return f"https://www.google.com/search?q={query}"
 
+
+def build_sportsbook_search_query(game_name: str, sportsbook: str) -> str:
+    return f"{game_name} {sportsbook} odds"
+
+
+def normalize_book_name(name: str) -> str:
+    name = name.lower()
+
+    if "draftkings" in name:
+        return "DraftKings"
+    if "fanduel" in name:
+        return "FanDuel"
+    if "betmgm" in name:
+        return "BetMGM"
+    if "caesars" in name:
+        return "Caesars"
+    if "betrivers" in name:
+        return "BetRivers"
+
+    return name.title()
 
 st.title("Best Betting Opportunities")
 st.caption(
@@ -229,15 +277,25 @@ if show_only_arbitrage:
 matching_games = filtered_event_df["Game"].tolist()
 filtered_detail_df = detail_df[detail_df["event"].isin(matching_games)].copy()
 display_detail_df = format_event_detail(filtered_detail_df)
+# Export raw and summary CSV files
+filtered_analyses = [a for a in all_analyses if a["event"] in matching_games]
+summary_export_df = export_summary_csv("betting_opportunities_summary.csv", filtered_analyses)
+detailed_export_df = export_detailed_csv("betting_opportunities_detailed.csv", filtered_analyses)
 
-best_efficiency = float(event_df["Market Efficiency"].min())
-arb_count = int((event_df["Guaranteed Profit"] == "Yes").sum())
+best_efficiency = float(filtered_event_df["Market Efficiency"].min()) if not filtered_event_df.empty else None
+arb_count = int((filtered_event_df["Guaranteed Profit"] == "Yes").sum())
 
 st.subheader("Quick summary")
 c1, c2, c3 = st.columns(3)
 c1.metric("Games analyzed", len(event_df))
 c2.metric("Guaranteed profit games", arb_count)
-c3.metric("Best market efficiency", f"{best_efficiency:.4f}")
+
+value = best_efficiency if best_efficiency is not None else 0
+
+c3.metric(
+    "Best market efficiency",
+    f"{value:.4f}" if best_efficiency is not None else "No data"
+)
 
 with st.expander("How to read this page"):
     st.write(
@@ -274,6 +332,32 @@ else:
             f"Estimated profit: **${best['Profit ($)']:.2f}**"
         )
 
+st.subheader("Summary View")
+
+summary_display_df = summary_export_df.copy()
+
+summary_display_df = summary_display_df.rename(columns={
+    "event": "Game",
+    "sport": "Sport",
+    "commence_time": "Start Time",
+    "implied_prob_sum": "Market Efficiency",
+    "arbitrage": "Guaranteed Profit",
+    "profit": "Profit ($)",
+    "roi": "Return (%)",
+    "best_outcome": "Best Team / Side",
+    "best_bookmaker": "Best Sportsbook",
+    "best_american_odds": "Best American Odds",
+    "best_decimal_odds": "Best Decimal Odds",
+})
+
+if "Guaranteed Profit" in summary_display_df.columns:
+    summary_display_df["Guaranteed Profit"] = summary_display_df["Guaranteed Profit"].map({
+        True: "Yes",
+        False: "No",
+    })
+
+st.dataframe(summary_display_df, use_container_width=True, hide_index=True)
+
 st.subheader("Game Breakdown")
 
 if matching_games:
@@ -300,16 +384,28 @@ if matching_games:
 
     with right:
         st.markdown("### Summary")
+
         st.write(f"**Game:** {event_summary['Game']}")
         st.write(f"**Sport:** {event_summary['Sport']}")
         st.write(f"**Market:** {format_market_label(market)}")
         st.write(f"**Guaranteed Profit:** {event_summary['Guaranteed Profit']}")
 
-        if pd.notna(event_summary["Profit ($)"]):
-            st.write(f"**Estimated Profit on ${bankroll:.0f}:** ${event_summary['Profit ($)']:.2f}")
+        profit = event_summary["Profit ($)"]
+        roi = event_summary["Return (%)"]
 
-        if pd.notna(event_summary["Return (%)"]):
-            st.write(f"**Expected Return:** {event_summary['Return (%)']:.2f}%")
+        col_a, col_b = st.columns(2)
+
+        with col_a:
+            st.metric(
+                label=f"Profit (on ${bankroll:.0f})",
+                value=f"${profit:.2f}" if pd.notna(profit) else "N/A"
+            )
+
+        with col_b:
+            st.metric(
+                label="Return",
+                value=f"{roi:.2f}%" if pd.notna(roi) else "N/A"
+            )
 
         st.markdown("### Learn more")
         game_info_link = build_game_info_link(selected_game)
@@ -319,7 +415,8 @@ if matching_games:
         if sportsbooks_used:
             st.markdown("### Best prices found at")
             for book in sportsbooks_used:
-                st.write(f"- {book}")
+                st.write(f"**{book}**")
+                st.code(build_sportsbook_search_query(selected_game, book), language=None)
 else:
     st.info("No games match the current filters.")
 
@@ -346,11 +443,27 @@ with st.expander("Show all filtered results"):
             hide_index=True,
         )
 
-csv_bytes = display_detail_df.to_csv(index=False).encode("utf-8")
-st.download_button(
-    label="Download results as CSV",
-    data=csv_bytes,
-    file_name="betting_opportunities.csv",
-    mime="text/csv",
-    use_container_width=True,
-)
+summary_csv_bytes = summary_export_df.to_csv(index=False).encode("utf-8")
+detailed_csv_bytes = detailed_export_df.to_csv(index=False).encode("utf-8")
+
+st.subheader("Download Data")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.download_button(
+        label="Download summary CSV",
+        data=summary_csv_bytes,
+        file_name="betting_opportunities_summary.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+with col2:
+    st.download_button(
+        label="Download detailed CSV",
+        data=detailed_csv_bytes,
+        file_name="betting_opportunities_detailed.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )

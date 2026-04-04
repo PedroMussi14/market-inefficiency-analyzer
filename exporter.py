@@ -24,7 +24,48 @@ def analyses_to_dataframe(analyses):
     return pd.DataFrame(rows)
 
 
-def export_to_csv(filename, analyses):
+def analyses_to_summary_dataframe(analyses):
+    rows = []
+
+    for analysis in analyses:
+        results = analysis.get("results", [])
+
+        best_outcome = None
+        best_bookmaker = None
+        best_decimal_odds = None
+        best_american_odds = None
+
+        if results:
+            best_row = max(results, key=lambda x: x.get("decimal_odds", 0))
+            best_outcome = best_row.get("outcome")
+            best_bookmaker = best_row.get("bookmaker")
+            best_decimal_odds = round(best_row.get("decimal_odds", 0), 4)
+            best_american_odds = best_row.get("american_odds")
+
+        rows.append({
+            "event": analysis["event"],
+            "sport": analysis["sport"],
+            "commence_time": analysis["commence_time"],
+            "implied_prob_sum": round(analysis["implied_prob_sum"], 4),
+            "arbitrage": analysis["arbitrage"],
+            "profit": round(analysis["profit"], 2) if analysis["profit"] is not None else None,
+            "roi": round(analysis["roi"], 2) if analysis["roi"] is not None else None,
+            "best_outcome": best_outcome,
+            "best_bookmaker": best_bookmaker,
+            "best_american_odds": best_american_odds,
+            "best_decimal_odds": best_decimal_odds,
+        })
+
+    return pd.DataFrame(rows)
+
+
+def export_detailed_csv(filename, analyses):
     df = analyses_to_dataframe(analyses)
+    df.to_csv(filename, index=False)
+    return df
+
+
+def export_summary_csv(filename, analyses):
+    df = analyses_to_summary_dataframe(analyses)
     df.to_csv(filename, index=False)
     return df
