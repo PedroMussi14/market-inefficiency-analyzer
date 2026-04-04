@@ -10,9 +10,10 @@ from exporter import (
     export_summary_csv,
 )
 
+st.set_page_config(page_title="Best Betting Opportunities", layout="wide")
+
 
 BOOK_LINKS = {
-    # 🇺🇸 US major sportsbooks
     "DraftKings": "https://sportsbook.draftkings.com/",
     "FanDuel": "https://sportsbook.fanduel.com/",
     "BetMGM": "https://sports.betmgm.com/",
@@ -23,8 +24,6 @@ BOOK_LINKS = {
     "Hard Rock Bet": "https://www.hardrock.bet/",
     "ESPN BET": "https://espnbet.com/",
     "Fanatics": "https://sportsbook.fanatics.com/",
-
-    # 🌍 International well-known sportsbooks
     "Bet365": "https://www.bet365.com/",
     "William Hill": "https://www.williamhill.com/",
     "888sport": "https://www.888sport.com/",
@@ -34,13 +33,10 @@ BOOK_LINKS = {
     "LeoVegas": "https://www.leovegas.com/",
     "Coral": "https://sports.coral.co.uk/",
     "Ladbrokes": "https://sports.ladbrokes.com/",
-
-    # 🌐 Offshore / others (already in your data)
     "Bovada": "https://www.bovada.lv/",
     "MyBookie.ag": "https://www.mybookie.ag/",
     "LowVig.ag": "https://www.lowvig.ag/",
 }
-st.set_page_config(page_title="Best Betting Opportunities", layout="wide")
 
 
 @st.cache_data(ttl=300)
@@ -149,8 +145,9 @@ def build_game_info_link(game_name: str) -> str:
     return f"https://www.google.com/search?q={query}"
 
 
-def build_sportsbook_search_query(game_name: str, sportsbook: str) -> str:
-    return f"{game_name} {sportsbook} odds"
+def build_general_odds_info_link(game_name: str) -> str:
+    query = quote_plus(game_name + " odds")
+    return f"https://www.google.com/search?q={query}"
 
 
 def normalize_book_name(name: str) -> str:
@@ -168,6 +165,7 @@ def normalize_book_name(name: str) -> str:
         return "BetRivers"
 
     return name.title()
+
 
 st.title("Best Betting Opportunities")
 st.caption(
@@ -277,7 +275,7 @@ if show_only_arbitrage:
 matching_games = filtered_event_df["Game"].tolist()
 filtered_detail_df = detail_df[detail_df["event"].isin(matching_games)].copy()
 display_detail_df = format_event_detail(filtered_detail_df)
-# Export raw and summary CSV files
+
 filtered_analyses = [a for a in all_analyses if a["event"] in matching_games]
 summary_export_df = export_summary_csv("betting_opportunities_summary.csv", filtered_analyses)
 detailed_export_df = export_detailed_csv("betting_opportunities_detailed.csv", filtered_analyses)
@@ -289,12 +287,9 @@ st.subheader("Quick summary")
 c1, c2, c3 = st.columns(3)
 c1.metric("Games analyzed", len(event_df))
 c2.metric("Guaranteed profit games", arb_count)
-
-value = best_efficiency if best_efficiency is not None else 0
-
 c3.metric(
     "Best market efficiency",
-    f"{value:.4f}" if best_efficiency is not None else "No data"
+    f"{best_efficiency:.4f}" if best_efficiency is not None else "No data"
 )
 
 with st.expander("How to read this page"):
@@ -350,12 +345,6 @@ summary_display_df = summary_display_df.rename(columns={
     "best_decimal_odds": "Best Decimal Odds",
 })
 
-if "Guaranteed Profit" in summary_display_df.columns:
-    summary_display_df["Guaranteed Profit"] = summary_display_df["Guaranteed Profit"].map({
-        True: "Yes",
-        False: "No",
-    })
-
 st.dataframe(summary_display_df, use_container_width=True, hide_index=True)
 
 st.subheader("Game Breakdown")
@@ -409,14 +398,26 @@ if matching_games:
 
         st.markdown("### Learn more")
         game_info_link = build_game_info_link(selected_game)
-        st.markdown(f"[Open matchup info and news]({game_info_link})")
+        general_odds_link = build_general_odds_info_link(selected_game)
+
+        st.link_button(
+            label="Open matchup info and news",
+            url=game_info_link,
+            use_container_width=True,
+        )
+        st.link_button(
+            label="Search general odds info",
+            url=general_odds_link,
+            use_container_width=True,
+        )
 
         sportsbooks_used = event_rows["Sportsbook"].dropna().unique().tolist()
         if sportsbooks_used:
             st.markdown("### Best prices found at")
+
             for book in sportsbooks_used:
-                st.write(f"**{book}**")
-                st.code(build_sportsbook_search_query(selected_game, book), language=None)
+                normalized = normalize_book_name(book)
+                st.button(normalized, use_container_width=True, disabled=True)
 else:
     st.info("No games match the current filters.")
 

@@ -1,5 +1,5 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,outcome,bookmaker,american_odds,decimal_odds,stake
-Seattle Mariners vs Los Angeles Angels,MLB,2026-04-04T01:50:00Z,0.9762,True,2.44,2.44,Los Angeles Angels,MyBookie.ag,100,2.0,51.22
-Seattle Mariners vs Los Angeles Angels,MLB,2026-04-04T01:50:00Z,0.9762,True,2.44,2.44,Seattle Mariners,FanDuel,110,2.1,48.78
+Seattle Mariners vs Los Angeles Angels,MLB,2026-04-04T01:50:00Z,0.7667,True,30.43,30.43,Los Angeles Angels,BetRivers,275,3.75,34.78
+Seattle Mariners vs Los Angeles Angels,MLB,2026-04-04T01:50:00Z,0.7667,True,30.43,30.43,Seattle Mariners,MyBookie.ag,100,2.0,65.22
 Seattle Mariners vs Los Angeles Angels,MLB,2026-04-05T01:39:00Z,1.0175,False,,,Los Angeles Angels,LowVig.ag,145,2.45,
 Seattle Mariners vs Los Angeles Angels,MLB,2026-04-05T01:39:00Z,1.0175,False,,,Seattle Mariners,FanDuel,-156,1.641,
