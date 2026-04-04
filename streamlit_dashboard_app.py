@@ -412,12 +412,20 @@ if matching_games:
         )
 
         sportsbooks_used = event_rows["Sportsbook"].dropna().unique().tolist()
+
         if sportsbooks_used:
             st.markdown("### Best prices found at")
 
             for book in sportsbooks_used:
                 normalized = normalize_book_name(book)
-                st.button(normalized, use_container_width=True, disabled=True)
+                search_link = build_sportsbook_search_link(selected_game, normalized)
+
+                st.link_button(
+                    label=normalized,
+                    url=search_link,
+                    use_container_width=True,
+                )
+
 else:
     st.info("No games match the current filters.")
 
@@ -467,4 +475,4 @@ with col2:
         file_name="betting_opportunities_detailed.csv",
         mime="text/csv",
         use_container_width=True,
-    )
+    )   
