@@ -25,10 +25,6 @@ def calculate_roi(bankroll, profit):
 
 
 def get_best_odds_for_event(event):
-    """
-    Extracts the best available odds for each outcome across all bookmakers.
-    Works for both 2-outcome and 3-outcome markets.
-    """
     best_odds = {}
 
     bookmakers = event.get("bookmakers", [])
@@ -65,40 +61,39 @@ def analyze_event(event, bankroll=100):
 
     outcome_names = list(best_odds.keys())
     decimal_odds = [best_odds[name]["odds"] for name in outcome_names]
-
     implied_prob_sum = sum(1 / odd for odd in decimal_odds)
-
-    print(f"\nChecking event: {event.get('away_team')} vs {event.get('home_team')}")
-    print("Best odds found:")
-    for name in outcome_names:
-        print(
-            f"  {name}: {best_odds[name]['odds']:.4f} "
-            f"at {best_odds[name]['bookmaker']}"
-        )
-        
-    print(f"Implied probability sum: {implied_prob_sum:.4f}")
-    if not is_arbitrage(decimal_odds):
-        return None
-
-    stakes = calculate_stakes(bankroll, decimal_odds)
-    profit = calculate_profit(bankroll, stakes, decimal_odds)
-    roi = calculate_roi(bankroll, profit)
+    arb_exists = is_arbitrage(decimal_odds)
 
     results = []
-    for name, stake in zip(outcome_names, stakes):
+    for name in outcome_names:
         results.append({
             "outcome": name,
             "bookmaker": best_odds[name]["bookmaker"],
             "american_odds": best_odds[name]["american_odds"],
             "decimal_odds": best_odds[name]["odds"],
-            "stake": stake,
         })
 
-    return {
+    analysis = {
         "event": f"{event.get('away_team')} vs {event.get('home_team')}",
         "sport": event.get("sport_title"),
         "commence_time": event.get("commence_time"),
-        "profit": profit,
-        "roi": roi,
+        "implied_prob_sum": implied_prob_sum,
+        "arbitrage": arb_exists,
         "results": results,
     }
+
+    if arb_exists:
+        stakes = calculate_stakes(bankroll, decimal_odds)
+        profit = calculate_profit(bankroll, stakes, decimal_odds)
+        roi = calculate_roi(bankroll, profit)
+
+        for i in range(len(results)):
+            results[i]["stake"] = stakes[i]
+
+        analysis["profit"] = profit
+        analysis["roi"] = roi
+    else:
+        analysis["profit"] = None
+        analysis["roi"] = None
+
+    return analysis
