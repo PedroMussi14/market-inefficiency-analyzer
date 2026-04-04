@@ -24,17 +24,39 @@ BOOK_LINKS = {
 @st.cache_data(ttl=300)
 def load_sports():
     sports = get_sports()
-    return {sport["title"]: sport["key"] for sport in sports}
+
+    excluded_keywords = [
+        "winner",
+        "outrights",
+        "championship",
+    ]
+
+    filtered_sports = {}
+    for sport in sports:
+        key = sport["key"]
+        title = sport["title"]
+
+        if any(word in key.lower() for word in excluded_keywords):
+            continue
+
+        filtered_sports[title] = key
+
+    return filtered_sports
 
 
 @st.cache_data(ttl=60)
 def load_data(sport_key: str, market: str, region: str, bankroll: float):
-    events = get_odds(
-        sport=sport_key,
-        markets=market,
-        regions=region,
-        odds_format="american",
-    )
+    try:
+        events = get_odds(
+            sport=sport_key,
+            markets=market,
+            regions=region,
+            odds_format="american",
+        )
+    except Exception as e:
+        raise Exception(
+            "This sport or market is not supported. Try another option."
+        )
 
     all_analyses = []
     for event in events:
@@ -103,9 +125,9 @@ def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
     for col in ["Market Efficiency", "Profit ($)", "Return (%)", "Decimal Odds", "Suggested Bet ($)"]:
         if col in display_df.columns:
             if col in ["Market Efficiency", "Decimal Odds"]:
-                display_df[col] = display_df[col].round(4)
+                display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(4).fillna("")
             else:
-                display_df[col] = display_df[col].round(2)
+                display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(2).fillna("")
 
     return display_df
 
