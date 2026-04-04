@@ -1,5 +1,7 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,outcome,bookmaker,american_odds,decimal_odds,stake
-Seattle Mariners vs Los Angeles Angels,MLB,2026-04-04T01:50:00Z,0.7667,True,30.43,30.43,Los Angeles Angels,BetRivers,275,3.75,34.78
-Seattle Mariners vs Los Angeles Angels,MLB,2026-04-04T01:50:00Z,0.7667,True,30.43,30.43,Seattle Mariners,MyBookie.ag,100,2.0,65.22
-Seattle Mariners vs Los Angeles Angels,MLB,2026-04-05T01:39:00Z,1.0175,False,,,Los Angeles Angels,LowVig.ag,145,2.45,
-Seattle Mariners vs Los Angeles Angels,MLB,2026-04-05T01:39:00Z,1.0175,False,,,Seattle Mariners,FanDuel,-156,1.641,
+San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0162,False,,,Denver Nuggets,BetMGM,118,2.18,
+San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0162,False,,,San Antonio Spurs,FanDuel,-126,1.7937,
+Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0267,False,,,Miami Heat,BetRivers,-1667,1.06,
+Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0267,False,,,Washington Wizards,DraftKings,1100,12.0,
+Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0087,False,,,Detroit Pistons,BetRivers,-117,1.8547,
+Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0087,False,,,Philadelphia 76ers,MyBookie.ag,113,2.13,

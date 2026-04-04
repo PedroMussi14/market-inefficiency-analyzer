@@ -2,6 +2,8 @@ import pandas as pd
 import streamlit as st
 
 from urllib.parse import quote_plus
+
+
 from api_client import get_odds, get_sports
 from arbitrage import analyze_event
 from exporter import (
@@ -153,19 +155,36 @@ def build_general_odds_info_link(game_name: str) -> str:
 def normalize_book_name(name: str) -> str:
     name = name.lower()
 
-    if "draftkings" in name:
-        return "DraftKings"
-    if "fanduel" in name:
-        return "FanDuel"
-    if "betmgm" in name:
-        return "BetMGM"
-    if "caesars" in name:
-        return "Caesars"
-    if "betrivers" in name:
-        return "BetRivers"
+    mapping = {
+        "draftkings": "DraftKings",
+        "fanduel": "FanDuel",
+        "betmgm": "BetMGM",
+        "caesars": "Caesars",
+        "betrivers": "BetRivers",
+        "pointsbet": "PointsBet",
+        "barstool": "Barstool",
+        "hard rock": "Hard Rock Bet",
+        "espn": "ESPN BET",
+        "fanatics": "Fanatics",
+        "bet365": "Bet365",
+        "william hill": "William Hill",
+        "888": "888sport",
+        "unibet": "Unibet",
+        "pinnacle": "Pinnacle",
+        "betway": "Betway",
+        "leovegas": "LeoVegas",
+        "coral": "Coral",
+        "ladbrokes": "Ladbrokes",
+        "bovada": "Bovada",
+        "mybookie": "MyBookie.ag",
+        "lowvig": "LowVig.ag",
+    }
+
+    for key in mapping:
+        if key in name:
+            return mapping[key]
 
     return name.title()
-
 
 st.title("Best Betting Opportunities")
 st.caption(
@@ -418,13 +437,17 @@ if matching_games:
 
             for book in sportsbooks_used:
                 normalized = normalize_book_name(book)
-                search_link = build_sportsbook_search_link(selected_game, normalized)
 
-                st.link_button(
-                    label=normalized,
-                    url=search_link,
-                    use_container_width=True,
-                )
+                url = BOOK_LINKS.get(normalized)
+
+                if url:
+                    st.link_button(
+                        label=normalized,
+                        url=url,
+                        use_container_width=True,
+                    )
+                else:
+                    st.write(normalized)
 
 else:
     st.info("No games match the current filters.")
