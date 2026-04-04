@@ -395,6 +395,11 @@ if matching_games:
 
     left, right = st.columns([1.2, 1])
 
+    simple_cols = ["Bet On", "Sportsbook", "American Odds", "Decimal Odds"]
+
+    if "Suggested Bet ($)" in event_rows.columns and event_rows["Suggested Bet ($)"].notna().any():
+        simple_cols.append("Suggested Bet ($)")
+
     with left:
         st.markdown("### 📊 Best Prices")
 

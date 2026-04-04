@@ -1,6 +1,6 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,outcome,bookmaker,american_odds,decimal_odds,stake
-San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0162,False,,,Denver Nuggets,BetMGM,118,2.18,
-San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0162,False,,,San Antonio Spurs,FanDuel,-126,1.7937,
+San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0248,False,,,Denver Nuggets,DraftKings,114,2.14,
+San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0248,False,,,San Antonio Spurs,FanDuel,-126,1.7937,
 Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0267,False,,,Miami Heat,BetRivers,-1667,1.06,
 Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0267,False,,,Washington Wizards,DraftKings,1100,12.0,
 Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0,False,,,Detroit Pistons,BetRivers,-117,1.8547,
