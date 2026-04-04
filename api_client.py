@@ -1,7 +1,11 @@
+import os
 import requests
+from dotenv import load_dotenv
 
-API_KEY = "31a6c4c71fa26d1e5c4e373837fc3544"
-SPORT = "basketball_nba"   # you can change this later
+load_dotenv()
+
+API_KEY = os.getenv("API_KEY")
+SPORT = "basketball_nba"
 REGIONS = "us"
 MARKETS = "h2h"
 ODDS_FORMAT = "american"

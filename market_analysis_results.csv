@@ -1,15 +1,11 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,outcome,bookmaker,american_odds,decimal_odds,stake
-Boston Celtics vs Milwaukee Bucks,NBA,2026-04-04T00:11:00Z,1.0195,False,,,Boston Celtics,BetMGM,-10000,1.01,
-Boston Celtics vs Milwaukee Bucks,NBA,2026-04-04T00:11:00Z,1.0195,False,,,Milwaukee Bucks,BetMGM,3300,34.0,
-Utah Jazz vs Houston Rockets,NBA,2026-04-04T00:12:00Z,1.0234,False,,,Houston Rockets,DraftKings,-100000,1.001,
-Utah Jazz vs Houston Rockets,NBA,2026-04-04T00:12:00Z,1.0234,False,,,Utah Jazz,DraftKings,4000,41.0,
-Orlando Magic vs Dallas Mavericks,NBA,2026-04-04T00:41:00Z,0.9511,True,5.14,5.14,Dallas Mavericks,FanDuel,800,9.0,11.68
-Orlando Magic vs Dallas Mavericks,NBA,2026-04-04T00:41:00Z,0.9511,True,5.14,5.14,Orlando Magic,Bovada,-525,1.1905,88.32
-New Orleans Pelicans vs Sacramento Kings,NBA,2026-04-04T02:10:00Z,1.0149,False,,,New Orleans Pelicans,FanDuel,-225,1.4444,
-New Orleans Pelicans vs Sacramento Kings,NBA,2026-04-04T02:10:00Z,1.0149,False,,,Sacramento Kings,LowVig.ag,210,3.1,
+Orlando Magic vs Dallas Mavericks,NBA,2026-04-04T00:41:00Z,1.0,False,,,Dallas Mavericks,DraftKings,1400,15.0,
+Orlando Magic vs Dallas Mavericks,NBA,2026-04-04T00:41:00Z,1.0,False,,,Orlando Magic,Bovada,-1400,1.0714,
+New Orleans Pelicans vs Sacramento Kings,NBA,2026-04-04T02:11:00Z,1.0319,False,,,New Orleans Pelicans,MyBookie.ag,-244,1.4098,
+New Orleans Pelicans vs Sacramento Kings,NBA,2026-04-04T02:11:00Z,1.0319,False,,,Sacramento Kings,BetMGM,210,3.1,
 San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0239,False,,,Denver Nuggets,BetMGM,118,2.18,
 San Antonio Spurs vs Denver Nuggets,NBA,2026-04-04T19:10:00Z,1.0239,False,,,San Antonio Spurs,FanDuel,-130,1.7692,
-Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0343,False,,,Miami Heat,BetRivers,-1667,1.06,
-Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0343,False,,,Washington Wizards,DraftKings,1000,11.0,
-Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0321,False,,,Detroit Pistons,DraftKings,102,2.02,
-Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0321,False,,,Philadelphia 76ers,FanDuel,-116,1.8621,
+Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0267,False,,,Miami Heat,BetRivers,-1667,1.06,
+Washington Wizards vs Miami Heat,NBA,2026-04-04T19:10:00Z,1.0267,False,,,Washington Wizards,FanDuel,1100,12.0,
+Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0,False,,,Detroit Pistons,BetRivers,100,2.0,
+Detroit Pistons vs Philadelphia 76ers,NBA,2026-04-04T23:10:00Z,1.0,False,,,Philadelphia 76ers,BetMGM,100,2.0,
