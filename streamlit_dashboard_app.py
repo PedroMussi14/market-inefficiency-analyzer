@@ -84,7 +84,7 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float):
         )
     except Exception as e:
         raise Exception(
-            "This sport or market is not supported. Try another option."
+            f"This sport or market is not supported right now. API details: {e}"
         ) from e
 
     all_analyses = []
