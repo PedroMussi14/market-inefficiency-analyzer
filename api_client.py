@@ -15,14 +15,28 @@ def get_sports():
     return response.json()
 
 
-def get_odds(sport="basketball_nba", markets="h2h", regions="us", odds_format="american"):
+def get_odds(
+    sport="basketball_nba",
+    markets="h2h",
+    regions="us",
+    odds_format="american",
+    include_links=True,      # New parameter (default True)
+    include_sids=True        # New parameter (default True)
+):
+    """
+    Fetch odds with optional deep links to bookmaker event pages and betslips.
+    """
     url = f"https://api.the-odds-api.com/v4/sports/{sport}/odds"
+    
     params = {
         "apiKey": API_KEY,
         "regions": regions,
         "markets": markets,
         "oddsFormat": odds_format,
+        "includeLinks": str(include_links).lower(),   # "true" or "false"
+        "includeSids": str(include_sids).lower(),
     }
+    
     response = requests.get(url, params=params, timeout=20)
     response.raise_for_status()
     return response.json()

@@ -81,11 +81,11 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float):
             markets=market,
             regions=region,
             odds_format="american",
+            include_links=True,      # ← Enable deep links
+            include_sids=True        # ← Recommended
         )
     except Exception as e:
-        raise Exception(
-            f"This sport or market is not supported right now. API details: {e}"
-        ) from e
+        raise Exception(f"This sport or market is not supported right now. API details: {e}") from e
 
     all_analyses = []
     for event in events:

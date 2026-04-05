@@ -1,2 +1,20 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-Oklahoma Sooners vs Michigan Wolverines,NCAAF,2026-09-12T16:00:00Z,0.9853,True,11.91,1.49,Oklahoma Sooners,FanDuel,122,2.22
+Milwaukee Brewers vs Kansas City Royals,MLB,2026-04-05T18:11:00Z,1.0195,False,,,Kansas City Royals,BetMGM,3300,34.0
+Cincinnati Reds vs Texas Rangers,MLB,2026-04-05T18:36:00Z,0.8833,True,13.21,13.21,Texas Rangers,BetRivers,650,7.5
+Philadelphia Phillies vs Colorado Rockies,MLB,2026-04-05T19:11:00Z,0.9484,True,5.44,5.44,Philadelphia Phillies,FanDuel,1700,18.0
+Los Angeles Dodgers vs Washington Nationals,MLB,2026-04-05T19:45:00Z,1.0245,False,,,Los Angeles Dodgers,FanDuel,1100,12.0
+Houston Astros vs Athletics,MLB,2026-04-05T20:06:00Z,1.0171,False,,,Houston Astros,BetMGM,-102,1.9804
+New York Mets vs San Francisco Giants,MLB,2026-04-05T20:06:00Z,0.7893,True,26.7,26.7,San Francisco Giants,FanDuel,190,2.9
+Seattle Mariners vs Los Angeles Angels,MLB,2026-04-05T20:08:00Z,0.9023,True,10.82,10.82,Los Angeles Angels,Bovada,190,2.9
+Atlanta Braves vs Arizona Diamondbacks,MLB,2026-04-05T20:11:00Z,0.9667,True,3.44,3.44,Arizona Diamondbacks,Bovada,120,2.2
+Chicago Cubs vs Cleveland Guardians,MLB,2026-04-05T20:42:49Z,1.0037,False,,,Cleveland Guardians,BetMGM,185,2.85
+Miami Marlins vs New York Yankees,MLB,2026-04-05T21:10:00Z,0.9747,True,2.59,2.59,Miami Marlins,BetMGM,260,3.6
+St. Louis Cardinals vs Detroit Tigers,MLB,2026-04-05T23:21:00Z,1.0209,False,,,St. Louis Cardinals,DraftKings,124,2.24
+Kansas City Royals vs Cleveland Guardians,MLB,2026-04-06T22:11:00Z,1.0238,False,,,Kansas City Royals,BetOnline.ag,100,2.0
+Cincinnati Reds vs Miami Marlins,MLB,2026-04-06T22:41:00Z,1.0244,False,,,Cincinnati Reds,LowVig.ag,107,2.07
+San Diego Padres vs Pittsburgh Pirates,MLB,2026-04-06T22:41:00Z,1.0221,False,,,San Diego Padres,BetUS,108,2.08
+Milwaukee Brewers vs Boston Red Sox,MLB,2026-04-06T22:46:00Z,1.0192,False,,,Boston Red Sox,BetUS,100,2.0
+St. Louis Cardinals vs Washington Nationals,MLB,2026-04-06T22:46:00Z,1.0244,False,,,St. Louis Cardinals,LowVig.ag,-105,1.9524
+Los Angeles Dodgers vs Toronto Blue Jays,MLB,2026-04-06T23:08:00Z,1.0231,False,,,Toronto Blue Jays,LowVig.ag,122,2.22
+Detroit Tigers vs Minnesota Twins,MLB,2026-04-06T23:41:00Z,1.0157,False,,,Detroit Tigers,FanDuel,108,2.08
+Seattle Mariners vs Texas Rangers,MLB,2026-04-07T00:06:00Z,1.0161,False,,,Seattle Mariners,BetUS,105,2.05
