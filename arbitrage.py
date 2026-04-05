@@ -24,18 +24,14 @@ def calculate_roi(bankroll, profit):
     return (profit / bankroll) * 100
 
 
-def get_best_odds_for_event(event):
+def get_best_odds_for_event(event, selected_market="h2h"):
     best_odds = {}
 
-    bookmakers = event.get("bookmakers", [])
-    if not bookmakers:
-        return {}
-
-    for bookmaker in bookmakers:
+    for bookmaker in event.get("bookmakers", []):
         book_title = bookmaker.get("title", bookmaker.get("key", "Unknown"))
 
         for market in bookmaker.get("markets", []):
-            if market.get("key") != "h2h":
+            if market.get("key") not in ["h2h", "spreads", "totals"]:
                 continue
 
             for outcome in market.get("outcomes", []):
@@ -43,18 +39,21 @@ def get_best_odds_for_event(event):
                 american_price = outcome["price"]
                 decimal_price = american_to_decimal(american_price)
 
+                link = outcome.get("link") or market.get("link") or bookmaker.get("link")
+
                 if name not in best_odds or decimal_price > best_odds[name]["odds"]:
                     best_odds[name] = {
                         "bookmaker": book_title,
                         "american_odds": american_price,
                         "odds": decimal_price,
+                        "link": link,
                     }
 
     return best_odds
 
 
 def analyze_event(event, bankroll=100):
-    best_odds = get_best_odds_for_event(event)
+    best_odds = get_best_odds_for_event(event, selected_market="h2h")
 
     if len(best_odds) < 2:
         return None
@@ -71,6 +70,7 @@ def analyze_event(event, bankroll=100):
             "bookmaker": best_odds[name]["bookmaker"],
             "american_odds": best_odds[name]["american_odds"],
             "decimal_odds": best_odds[name]["odds"],
+            "link": best_odds[name].get("link")   # ← NEW: Add link to each result
         })
 
     analysis = {

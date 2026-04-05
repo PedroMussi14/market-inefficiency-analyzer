@@ -2,8 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from urllib.parse import quote_plus
-
-
+from datetime import datetime, timezone
 from api_client import get_odds, get_sports
 from arbitrage import analyze_event
 from exporter import (
@@ -38,6 +37,10 @@ BOOK_LINKS = {
     "Bovada": "https://www.bovada.lv/",
     "MyBookie.ag": "https://www.mybookie.ag/",
     "LowVig.ag": "https://www.lowvig.ag/",
+    "BetUS": "https://www.betus.com.pa/",
+    "BetUS.ag": "https://www.betus.com.pa/",
+    "BetOnline": "https://www.betonline.ag/",
+    "BetOnline.ag": "https://www.betonline.ag/",
 }
 
 
@@ -50,6 +53,56 @@ st.markdown("""
 
 section[data-testid="stSidebar"] {
     width: 300px !important;
+}
+
+/* === LIVE INDICATOR STYLES === */
+.live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    color: #ff4444;
+    font-size: 1.15rem;
+    margin: 8px 0;
+}
+
+.live-dot {
+    width: 14px;
+    height: 14px;
+    background-color: #ff4444;
+    border-radius: 50%;
+    position: relative;
+    animation: pulse 1.8s infinite ease-in-out;
+    box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.8);
+}
+
+.live-dot::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: #ff4444;
+    animation: ring 1.8s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+@keyframes ring {
+    0% { transform: scale(0.6); opacity: 1; }
+    100% { transform: scale(2.8); opacity: 0; }
+}
+
+.live-text {
+    animation: blink-text 2s infinite;
+}
+
+@keyframes blink-text {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.75; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -96,6 +149,9 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float):
     detail_df = analyses_to_dataframe(all_analyses)
     event_df = summarize_by_event(all_analyses)
 
+    # NEW: Add direct links to the detailed dataframe
+    detail_df = add_direct_links(detail_df, all_analyses)
+
     return all_analyses, detail_df, event_df
 
 
@@ -123,6 +179,31 @@ def format_market_label(market_key: str) -> str:
         "totals": "Game Total",
     }
     return labels.get(market_key, market_key)
+
+def is_live_event(commence_time_str: str) -> bool:
+    """Check if the game has already started (is live)"""
+    if not commence_time_str:
+        return False
+    try:
+        # Convert "2026-04-05T19:40:00Z" to datetime
+        event_time = datetime.fromisoformat(commence_time_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        return event_time <= now   # started or starting now
+    except:
+        return False
+
+
+def live_badge(is_live: bool = False):
+    """Returns pulsing LIVE indicator only when the game is actually live"""
+    if not is_live:
+        return ""
+    
+    return """
+    <div class="live-indicator">
+        <span class="live-dot"></span>
+        <span class="live-text">LIVE</span>
+    </div>
+    """
 
 
 def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
@@ -154,6 +235,27 @@ def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
 
     return display_df
 
+def add_direct_links(df, analyses):
+    """Add Direct Link column using the links we stored in analyze_event"""
+    df = df.copy()
+    df["Direct Link"] = None
+    
+    for idx, row in df.iterrows():
+        # Get game name - handle both column names
+        game = row.get("event") or row.get("Game")
+        book = row.get("bookmaker")
+        
+        if not game or not book:
+            continue
+            
+        for analysis in analyses:
+            if analysis.get("event") == game:
+                for res in analysis.get("results", []):
+                    if res.get("bookmaker") == book:
+                        df.at[idx, "Direct Link"] = res.get("link")
+                        break
+                break  # No need to check other analyses
+    return df
 
 def build_game_info_link(game_name: str) -> str:
     query = quote_plus(game_name + " ESPN")
@@ -164,9 +266,27 @@ def build_general_odds_info_link(game_name: str) -> str:
     query = quote_plus(game_name + " odds")
     return f"https://www.google.com/search?q={query}"
 
+def clean_bookmaker_link(raw_link: str, book_title: str) -> str:
+    """Clean and fix deep links, especially broken BetMGM ones"""
+    if not raw_link or not str(raw_link).startswith("http"):
+        return None
+    
+    link_str = str(raw_link).strip()
+
+    # === Special handling for BetMGM ===
+    if "betmgm.com" in link_str.lower():
+        if "{state}" in link_str:
+            link_str = link_str.replace("{state}", "www")
+        
+        # If it still contains ".betmgm.com" with "sports." or weird state, force fallback to clean homepage
+        if "sports.www.betmgm.com" in link_str or "{state}" in link_str:
+            return None  # Force homepage fallback - more reliable than broken link
+
+    return link_str
 
 def normalize_book_name(name: str) -> str:
     name = name.lower()
+
 
     mapping = {
         "draftkings": "DraftKings",
@@ -191,6 +311,11 @@ def normalize_book_name(name: str) -> str:
         "bovada": "Bovada",
         "mybookie": "MyBookie.ag",
         "lowvig": "LowVig.ag",
+        "betus": "BetUS",
+        "betus.ag": "BetUS",
+        "betonline": "BetOnline",
+        "betonline.ag": "BetOnline",
+        
     }
 
     for key in mapping:
@@ -400,6 +525,10 @@ if matching_games:
     if "Suggested Bet ($)" in event_rows.columns and event_rows["Suggested Bet ($)"].notna().any():
         simple_cols.append("Suggested Bet ($)")
 
+    # Show direct link if available
+    if "Direct Link" in event_rows.columns:
+        simple_cols.append("Direct Link")
+
     with left:
         st.markdown("### 📊 Best Prices")
 
@@ -423,6 +552,23 @@ if matching_games:
 
     with right:
         st.markdown("### Summary")
+
+        # Get the correct commence time for the currently selected game
+        commence_time = (event_summary.get("Start Time") 
+                        or event_summary.get("commence_time") 
+                        or "")
+
+        # Check if THIS specific game is live
+        is_current_game_live = is_live_event(commence_time)
+
+        # Show live badge only for the current game
+        if is_current_game_live:
+            st.markdown(live_badge(True), unsafe_allow_html=True)
+        else:
+            st.markdown(live_badge(False), unsafe_allow_html=True)  # clears previous badge
+
+                # Force clear any previous live badge
+        st.markdown("<div style='height: 0; margin: 0;'></div>", unsafe_allow_html=True)
 
         st.write(f"**Game:** {event_summary['Game']}")
         st.write(f"**Sport:** {event_summary['Sport']}")
@@ -469,16 +615,39 @@ if matching_games:
             for book in sportsbooks_used:
                 normalized = normalize_book_name(book)
 
-                url = BOOK_LINKS.get(normalized)
+                # Find raw link from API
+                direct_link = None
+                for analysis in filtered_analyses:
+                    if analysis.get("event") == selected_game:
+                        for res in analysis.get("results", []):
+                            if res.get("bookmaker") == book:
+                                direct_link = res.get("link")
+                                break
+                        if direct_link:
+                            break
 
-                if url:
+                # Clean the link
+                cleaned_link = clean_bookmaker_link(direct_link, normalized)
+
+                if cleaned_link and cleaned_link.startswith("http"):
                     st.link_button(
-                        label=normalized,
-                        url=url,
+                        label=f"→ {normalized} (Direct to Match)",
+                        url=cleaned_link,
                         use_container_width=True,
                     )
                 else:
-                    st.write(normalized)
+                    # Fallback to homepage for BetMGM and other problematic links
+                    homepage = BOOK_LINKS.get(normalized)
+                    if homepage:
+                        st.link_button(
+                            label=f"{normalized} (Homepage)",
+                            url=homepage,
+                            use_container_width=True,
+                        )
+                    else:
+                        st.write(normalized)
+
+    st.caption("Direct links are provided by the bookmaker when available. Some books (like BetMGM) often only allow homepage links.")
 
 else:
     st.info("No games match the current filters.")
