@@ -1,5 +1,7 @@
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
+import plotly.express as px
 
 from urllib.parse import quote_plus
 from datetime import datetime, timezone
@@ -11,7 +13,11 @@ from exporter import (
     export_summary_csv,
 )
 
-st.set_page_config(page_title="Best Betting Opportunities", layout="wide")
+st.set_page_config(
+    page_title="BetScan — Arbitrage Finder",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 
 BOOK_LINKS = {
@@ -44,85 +50,375 @@ BOOK_LINKS = {
 }
 
 
-st.markdown("""
+# ─── DESIGN SYSTEM ────────────────────────────────────────────────────────────
+COLORS = {
+    "bg":           "#0d0f14",
+    "surface":      "#161922",
+    "surface2":     "#1e222d",
+    "border":       "#2a2f3e",
+    "accent":       "#00e5a0",
+    "accent2":      "#3d9bff",
+    "warning":      "#f5a623",
+    "danger":       "#ff5b5b",
+    "text":         "#e8ecf3",
+    "text_muted":   "#6b7694",
+    "arb_green":    "#00e5a0",
+    "close_yellow": "#f5a623",
+    "far_red":      "#ff5b5b",
+}
+
+PLOTLY_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="'IBM Plex Mono', monospace", color=COLORS["text"], size=12),
+    margin=dict(l=10, r=10, t=30, b=10),
+    hoverlabel=dict(
+        bgcolor=COLORS["surface2"],
+        bordercolor=COLORS["border"],
+        font_color=COLORS["text"],
+    ),
+)
+
+
+st.markdown(f"""
 <style>
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 1rem;
-}
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap');
 
-section[data-testid="stSidebar"] {
-    width: 300px !important;
-}
+/* ── ROOT & GLOBAL ── */
+:root {{
+    --bg:         {COLORS["bg"]};
+    --surface:    {COLORS["surface"]};
+    --surface2:   {COLORS["surface2"]};
+    --border:     {COLORS["border"]};
+    --accent:     {COLORS["accent"]};
+    --accent2:    {COLORS["accent2"]};
+    --warn:       {COLORS["warning"]};
+    --danger:     {COLORS["danger"]};
+    --text:       {COLORS["text"]};
+    --muted:      {COLORS["text_muted"]};
+}}
 
-/* === LIVE INDICATOR STYLES === */
-.live-indicator {
+html, body, [data-testid="stAppViewContainer"],
+[data-testid="stMain"], .main {{
+    background-color: var(--bg) !important;
+    color: var(--text) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+}}
+
+/* ── SIDEBAR ── */
+section[data-testid="stSidebar"] {{
+    background-color: var(--surface) !important;
+    border-right: 1px solid var(--border) !important;
+    width: 290px !important;
+}}
+section[data-testid="stSidebar"] * {{
+    color: var(--text) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+}}
+section[data-testid="stSidebar"] .stSelectbox > div,
+section[data-testid="stSidebar"] .stNumberInput > div,
+section[data-testid="stSidebar"] .stRadio > div {{
+    background-color: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+}}
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] .stMarkdown p {{
+    color: var(--muted) !important;
+    font-size: 0.72rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}}
+section[data-testid="stSidebar"] h2 {{
+    font-family: 'Syne', sans-serif !important;
+    font-size: 1rem !important;
+    color: var(--accent) !important;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}}
+
+/* ── MAIN HEADING ── */
+h1 {{
+    font-family: 'Syne', sans-serif !important;
+    font-size: 2.2rem !important;
+    font-weight: 800 !important;
+    color: var(--text) !important;
+    letter-spacing: -0.01em;
+    margin-bottom: 0 !important;
+}}
+h2, h3 {{
+    font-family: 'Syne', sans-serif !important;
+    color: var(--text) !important;
+    letter-spacing: 0.02em;
+}}
+
+/* ── CAPTION / SUBTEXT ── */
+.stCaption, [data-testid="stCaptionContainer"] p {{
+    color: var(--muted) !important;
+    font-size: 0.75rem !important;
+}}
+
+/* ── METRIC CARDS ── */
+[data-testid="stMetric"] {{
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    padding: 1rem 1.2rem !important;
+}}
+[data-testid="stMetricLabel"] p {{
+    color: var(--muted) !important;
+    font-size: 0.7rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}}
+[data-testid="stMetricValue"] {{
+    color: var(--accent) !important;
+    font-family: 'Syne', sans-serif !important;
+    font-size: 1.8rem !important;
+    font-weight: 800 !important;
+}}
+
+/* ── DATAFRAME ── */
+[data-testid="stDataFrame"] {{
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+}}
+.dvn-scroller {{
+    background: var(--surface) !important;
+}}
+
+/* ── BUTTONS ── */
+.stButton > button, .stDownloadButton > button {{
+    background: transparent !important;
+    border: 1px solid var(--accent) !important;
+    color: var(--accent) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.78rem !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+}}
+.stButton > button:hover, .stDownloadButton > button:hover {{
+    background: var(--accent) !important;
+    color: var(--bg) !important;
+    transform: translateY(-1px);
+}}
+.stLinkButton a {{
+    background: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--accent2) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.75rem !important;
+    border-radius: 6px !important;
+    text-decoration: none !important;
+    transition: all 0.2s ease !important;
+}}
+.stLinkButton a:hover {{
+    border-color: var(--accent2) !important;
+    background: rgba(61, 155, 255, 0.12) !important;
+}}
+
+/* ── SELECT BOX & INPUTS ── */
+.stSelectbox [data-baseweb="select"] > div,
+.stNumberInput input {{
+    background-color: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    border-radius: 6px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+}}
+.stSelectbox [data-baseweb="popover"] {{
+    background-color: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+}}
+
+/* ── ALERTS / NOTICES ── */
+.stSuccess {{
+    background: rgba(0, 229, 160, 0.08) !important;
+    border-left: 3px solid var(--accent) !important;
+    color: var(--text) !important;
+    border-radius: 0 6px 6px 0 !important;
+}}
+.stInfo {{
+    background: rgba(61, 155, 255, 0.08) !important;
+    border-left: 3px solid var(--accent2) !important;
+    color: var(--text) !important;
+    border-radius: 0 6px 6px 0 !important;
+}}
+.stWarning {{
+    background: rgba(245, 166, 35, 0.08) !important;
+    border-left: 3px solid var(--warn) !important;
+    border-radius: 0 6px 6px 0 !important;
+}}
+
+/* ── EXPANDER ── */
+.streamlit-expanderHeader {{
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 0.8rem !important;
+}}
+.streamlit-expanderContent {{
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-top: none !important;
+    border-radius: 0 0 8px 8px !important;
+}}
+
+/* ── SPINNER ── */
+.stSpinner > div {{
+    border-top-color: var(--accent) !important;
+}}
+
+/* ── SLIDER ── */
+.stSlider [data-baseweb="slider"] [role="slider"] {{
+    background: var(--accent) !important;
+}}
+.stSlider [data-baseweb="slider"] [data-testid="stSliderTrackFill"] {{
+    background: var(--accent) !important;
+}}
+
+/* ── CHECKBOX ── */
+.stCheckbox [data-baseweb="checkbox"] input:checked + div {{
+    background: var(--accent) !important;
+    border-color: var(--accent) !important;
+}}
+
+/* ── DIVIDER ── */
+hr {{
+    border-color: var(--border) !important;
+}}
+
+/* ── LIVE INDICATOR ── */
+.live-indicator {{
     display: inline-flex;
     align-items: center;
     gap: 8px;
     font-weight: 700;
-    color: #ff4444;
-    font-size: 1.15rem;
-    margin: 8px 0;
-}
-
-.live-dot {
-    width: 14px;
-    height: 14px;
-    background-color: #ff4444;
+    color: var(--danger);
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin: 4px 0 8px;
+}}
+.live-dot {{
+    width: 10px;
+    height: 10px;
+    background-color: var(--danger);
     border-radius: 50%;
-    position: relative;
     animation: pulse 1.8s infinite ease-in-out;
-    box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.8);
-}
-
-.live-dot::after {
+}}
+.live-dot::after {{
     content: '';
     position: absolute;
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background-color: #ff4444;
+    background-color: var(--danger);
     animation: ring 1.8s infinite ease-in-out;
-}
+}}
+@keyframes pulse {{
+    0%, 100% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(255,91,91,0.7); }}
+    50% {{ transform: scale(1.15); box-shadow: 0 0 0 6px rgba(255,91,91,0); }}
+}}
+@keyframes ring {{
+    0% {{ transform: scale(0.6); opacity: 1; }}
+    100% {{ transform: scale(2.8); opacity: 0; }}
+}}
 
-@keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-}
+/* ── BADGE PILL ── */
+.badge {{
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}}
+.badge-arb {{
+    background: rgba(0,229,160,0.15);
+    color: {COLORS["arb_green"]};
+    border: 1px solid {COLORS["arb_green"]};
+}}
+.badge-close {{
+    background: rgba(245,166,35,0.12);
+    color: {COLORS["close_yellow"]};
+    border: 1px solid {COLORS["close_yellow"]};
+}}
+.badge-normal {{
+    background: rgba(107,118,148,0.15);
+    color: {COLORS["text_muted"]};
+    border: 1px solid {COLORS["border"]};
+}}
 
-@keyframes ring {
-    0% { transform: scale(0.6); opacity: 1; }
-    100% { transform: scale(2.8); opacity: 0; }
-}
+/* ── GAME CARD ── */
+.game-card {{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 0.5rem;
+    transition: border-color 0.2s;
+}}
+.game-card:hover {{
+    border-color: var(--accent);
+}}
 
-.live-text {
-    animation: blink-text 2s infinite;
-}
+/* ── SECTION LABEL ── */
+.section-label {{
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.4rem;
+    display: block;
+}}
 
-@keyframes blink-text {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.75; }
-}
+/* ── HEADER TICKER ── */
+.header-bar {{
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 0.25rem;
+}}
+.header-tag {{
+    font-size: 0.7rem;
+    color: var(--accent);
+    background: rgba(0,229,160,0.1);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 2px 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}}
+
+.block-container {{
+    padding-top: 1.5rem !important;
+    padding-bottom: 2rem !important;
+    max-width: 1400px !important;
+}}
 </style>
 """, unsafe_allow_html=True)
+
+
+# ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
 def load_sports():
     sports = get_sports()
-
     excluded_keywords = ["winner", "outrights", "championship"]
-
     filtered_sports = {}
     for sport in sports:
         key = sport["key"]
         title = sport["title"]
-
         if any(word in key.lower() for word in excluded_keywords):
             continue
-
         filtered_sports[title] = key
-
     return filtered_sports
 
 
@@ -134,8 +430,8 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float):
             markets=market,
             regions=region,
             odds_format="american",
-            include_links=True,      # ← Enable deep links
-            include_sids=True        # ← Recommended
+            include_links=True,
+            include_sids=True,
         )
     except Exception as e:
         raise Exception(f"This sport or market is not supported right now. API details: {e}") from e
@@ -148,8 +444,6 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float):
 
     detail_df = analyses_to_dataframe(all_analyses)
     event_df = summarize_by_event(all_analyses)
-
-    # NEW: Add direct links to the detailed dataframe
     detail_df = add_direct_links(detail_df, all_analyses)
 
     return all_analyses, detail_df, event_df
@@ -157,7 +451,6 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float):
 
 def summarize_by_event(all_analyses):
     rows = []
-
     for analysis in all_analyses:
         rows.append({
             "Game": analysis["event"],
@@ -168,186 +461,333 @@ def summarize_by_event(all_analyses):
             "Profit ($)": round(analysis["profit"], 2) if analysis["profit"] is not None else None,
             "Return (%)": round(analysis["roi"], 2) if analysis["roi"] is not None else None,
         })
-
     return pd.DataFrame(rows)
 
 
-def format_market_label(market_key: str) -> str:
-    labels = {
-        "h2h": "Moneyline / Match Winner",
-        "spreads": "Point Spread",
-        "totals": "Game Total",
-    }
-    return labels.get(market_key, market_key)
-
-def is_live_event(commence_time_str: str) -> bool:
-    """Check if the game has already started (is live)"""
-    if not commence_time_str:
-        return False
-    try:
-        # Convert "2026-04-05T19:40:00Z" to datetime
-        event_time = datetime.fromisoformat(commence_time_str.replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
-        return event_time <= now   # started or starting now
-    except:
-        return False
-
-
-def live_badge(is_live: bool = False):
-    """Returns pulsing LIVE indicator only when the game is actually live"""
-    if not is_live:
-        return ""
-    
-    return """
-    <div class="live-indicator">
-        <span class="live-dot"></span>
-        <span class="live-text">LIVE</span>
-    </div>
-    """
-
-
-def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
-    display_df = df.copy()
-
-    rename_map = {
-        "event": "Game",
-        "sport": "Sport",
-        "commence_time": "Start Time",
-        "implied_prob_sum": "Market Efficiency",
-        "arbitrage": "Guaranteed Profit",
-        "profit": "Profit ($)",
-        "roi": "Return (%)",
-        "outcome": "Bet On",
-        "bookmaker": "Sportsbook",
-        "american_odds": "American Odds",
-        "decimal_odds": "Decimal Odds",
-        "stake": "Suggested Bet ($)",
-    }
-
-    display_df = display_df.rename(columns=rename_map)
-
-    for col in ["Market Efficiency", "Profit ($)", "Return (%)", "Decimal Odds", "Suggested Bet ($)"]:
-        if col in display_df.columns:
-            if col in ["Market Efficiency", "Decimal Odds"]:
-                display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(4)
-            else:
-                display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(2)
-
-    return display_df
-
 def add_direct_links(df, analyses):
-    """Add Direct Link column using the links we stored in analyze_event"""
     df = df.copy()
     df["Direct Link"] = None
-    
     for idx, row in df.iterrows():
-        # Get game name - handle both column names
         game = row.get("event") or row.get("Game")
         book = row.get("bookmaker")
-        
         if not game or not book:
             continue
-            
         for analysis in analyses:
             if analysis.get("event") == game:
                 for res in analysis.get("results", []):
                     if res.get("bookmaker") == book:
                         df.at[idx, "Direct Link"] = res.get("link")
                         break
-                break  # No need to check other analyses
+                break
     return df
 
-def build_game_info_link(game_name: str) -> str:
-    query = quote_plus(game_name + " ESPN")
-    return f"https://www.google.com/search?q={query}"
+
+def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
+    display_df = df.copy()
+    rename_map = {
+        "event": "Game", "sport": "Sport", "commence_time": "Start Time",
+        "implied_prob_sum": "Market Efficiency", "arbitrage": "Guaranteed Profit",
+        "profit": "Profit ($)", "roi": "Return (%)", "outcome": "Bet On",
+        "bookmaker": "Sportsbook", "american_odds": "American Odds",
+        "decimal_odds": "Decimal Odds", "stake": "Suggested Bet ($)",
+    }
+    display_df = display_df.rename(columns=rename_map)
+    for col in ["Market Efficiency", "Profit ($)", "Return (%)", "Decimal Odds", "Suggested Bet ($)"]:
+        if col in display_df.columns:
+            rnd = 4 if col in ["Market Efficiency", "Decimal Odds"] else 2
+            display_df[col] = pd.to_numeric(display_df[col], errors="coerce").round(rnd)
+    return display_df
 
 
-def build_general_odds_info_link(game_name: str) -> str:
-    query = quote_plus(game_name + " odds")
-    return f"https://www.google.com/search?q={query}"
+def is_live_event(commence_time_str: str) -> bool:
+    if not commence_time_str:
+        return False
+    try:
+        event_time = datetime.fromisoformat(commence_time_str.replace("Z", "+00:00"))
+        return event_time <= datetime.now(timezone.utc)
+    except Exception:
+        return False
+
+
+def format_market_label(market_key: str) -> str:
+    return {"h2h": "Moneyline / Match Winner", "spreads": "Point Spread", "totals": "Game Total"}.get(market_key, market_key)
+
 
 def clean_bookmaker_link(raw_link: str, book_title: str) -> str:
-    """Clean and fix deep links, especially broken BetMGM ones"""
     if not raw_link or not str(raw_link).startswith("http"):
         return None
-    
     link_str = str(raw_link).strip()
-
-    # === Special handling for BetMGM ===
     if "betmgm.com" in link_str.lower():
         if "{state}" in link_str:
             link_str = link_str.replace("{state}", "www")
-        
-        # If it still contains ".betmgm.com" with "sports." or weird state, force fallback to clean homepage
         if "sports.www.betmgm.com" in link_str or "{state}" in link_str:
-            return None  # Force homepage fallback - more reliable than broken link
-
+            return None
     return link_str
 
+
 def normalize_book_name(name: str) -> str:
-    name = name.lower()
-
-
+    name_lower = name.lower()
     mapping = {
-        "draftkings": "DraftKings",
-        "fanduel": "FanDuel",
-        "betmgm": "BetMGM",
-        "caesars": "Caesars",
-        "betrivers": "BetRivers",
-        "pointsbet": "PointsBet",
-        "barstool": "Barstool",
-        "hard rock": "Hard Rock Bet",
-        "espn": "ESPN BET",
-        "fanatics": "Fanatics",
-        "bet365": "Bet365",
-        "william hill": "William Hill",
-        "888": "888sport",
-        "unibet": "Unibet",
-        "pinnacle": "Pinnacle",
-        "betway": "Betway",
-        "leovegas": "LeoVegas",
-        "coral": "Coral",
-        "ladbrokes": "Ladbrokes",
-        "bovada": "Bovada",
-        "mybookie": "MyBookie.ag",
-        "lowvig": "LowVig.ag",
-        "betus": "BetUS",
-        "betus.ag": "BetUS",
-        "betonline": "BetOnline",
-        "betonline.ag": "BetOnline",
-        
+        "draftkings": "DraftKings", "fanduel": "FanDuel", "betmgm": "BetMGM",
+        "caesars": "Caesars", "betrivers": "BetRivers", "pointsbet": "PointsBet",
+        "barstool": "Barstool", "hard rock": "Hard Rock Bet", "espn": "ESPN BET",
+        "fanatics": "Fanatics", "bet365": "Bet365", "william hill": "William Hill",
+        "888": "888sport", "unibet": "Unibet", "pinnacle": "Pinnacle",
+        "betway": "Betway", "leovegas": "LeoVegas", "coral": "Coral",
+        "ladbrokes": "Ladbrokes", "bovada": "Bovada", "mybookie": "MyBookie.ag",
+        "lowvig": "LowVig.ag", "betus": "BetUS", "betonline": "BetOnline",
     }
-
     for key in mapping:
-        if key in name:
+        if key in name_lower:
             return mapping[key]
-
     return name.title()
 
-st.title("Best Betting Opportunities")
-st.caption(
-    "We scan sportsbook odds and show the games with the best potential return. "
-    "Focus on the game, the sportsbook, and the expected return."
-)
+
+def efficiency_badge(eff: float) -> str:
+    if eff < 1.0:
+        return '<span class="badge badge-arb">⚡ Arbitrage</span>'
+    elif eff < 1.015:
+        return '<span class="badge badge-close">◈ Near Arb</span>'
+    else:
+        return '<span class="badge badge-normal">◇ Normal</span>'
+
+
+def build_game_info_link(game_name: str) -> str:
+    return f"https://www.google.com/search?q={quote_plus(game_name + ' ESPN')}"
+
+
+def build_general_odds_info_link(game_name: str) -> str:
+    return f"https://www.google.com/search?q={quote_plus(game_name + ' odds')}"
+
+
+# ─── CHARTS ──────────────────────────────────────────────────────────────────
+
+def chart_efficiency_ranking(event_df: pd.DataFrame, top_n: int = 20) -> go.Figure:
+    """Horizontal bar chart — market efficiency for top N games."""
+    df = event_df.sort_values("Market Efficiency").head(top_n).copy()
+
+    def bar_color(eff):
+        if eff < 1.0:
+            return COLORS["arb_green"]
+        elif eff < 1.015:
+            return COLORS["warning"]
+        return COLORS["accent2"]
+
+    colors = [bar_color(e) for e in df["Market Efficiency"]]
+
+    # Shorten game names for display
+    short_names = [g[:30] + "…" if len(g) > 30 else g for g in df["Game"]]
+
+    fig = go.Figure(go.Bar(
+        x=df["Market Efficiency"],
+        y=short_names,
+        orientation="h",
+        marker_color=colors,
+        marker_line_width=0,
+        text=[f"{e:.4f}" for e in df["Market Efficiency"]],
+        textposition="outside",
+        textfont=dict(color=COLORS["text"], size=10),
+        hovertemplate="<b>%{y}</b><br>Efficiency: %{x:.4f}<extra></extra>",
+    ))
+
+    fig.add_vline(
+        x=1.0, line_width=1.5, line_dash="dash",
+        line_color=COLORS["arb_green"],
+        annotation_text=" Arbitrage threshold",
+        annotation_font_color=COLORS["arb_green"],
+        annotation_font_size=10,
+    )
+
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="Market Efficiency Ranking", font_size=13, font_color=COLORS["text_muted"]),
+        xaxis=dict(
+            showgrid=True, gridcolor=COLORS["border"], gridwidth=0.5,
+            zeroline=False, tickfont_size=10,
+            range=[max(0.95, df["Market Efficiency"].min() - 0.005),
+                   df["Market Efficiency"].max() + 0.008],
+        ),
+        yaxis=dict(showgrid=False, tickfont_size=10),
+        height=max(300, len(df) * 34),
+        bargap=0.35,
+    )
+    return fig
+
+
+def chart_odds_comparison(event_rows_df: pd.DataFrame, game_name: str) -> go.Figure:
+    """Grouped bar chart comparing decimal odds per outcome for a selected game."""
+    df = event_rows_df[["Bet On", "Sportsbook", "Decimal Odds"]].dropna()
+
+    outcomes = df["Bet On"].unique()
+    colors_list = [COLORS["accent"], COLORS["accent2"], COLORS["warning"], COLORS["danger"]]
+
+    fig = go.Figure()
+    for i, outcome in enumerate(outcomes):
+        sub = df[df["Bet On"] == outcome].sort_values("Decimal Odds", ascending=False)
+        fig.add_trace(go.Bar(
+            name=str(outcome),
+            x=sub["Sportsbook"],
+            y=sub["Decimal Odds"],
+            marker_color=colors_list[i % len(colors_list)],
+            marker_line_width=0,
+            text=[f"{v:.3f}" for v in sub["Decimal Odds"]],
+            textposition="outside",
+            textfont=dict(size=9, color=COLORS["text"]),
+            hovertemplate="<b>%{x}</b><br>Odds: %{y:.4f}<extra>" + str(outcome) + "</extra>",
+        ))
+
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="Odds by Sportsbook", font_size=13, font_color=COLORS["text_muted"]),
+        barmode="group",
+        xaxis=dict(showgrid=False, tickfont_size=10, tickangle=-30),
+        yaxis=dict(showgrid=True, gridcolor=COLORS["border"], gridwidth=0.5, zeroline=False, tickfont_size=10),
+        legend=dict(
+            bgcolor="rgba(0,0,0,0)", bordercolor=COLORS["border"], borderwidth=1,
+            font_size=10, orientation="h", yanchor="bottom", y=1.02,
+        ),
+        height=340,
+        bargap=0.2,
+        bargroupgap=0.08,
+    )
+    return fig
+
+
+def chart_stake_pie(event_rows_df: pd.DataFrame, bankroll: float) -> go.Figure | None:
+    """Pie / donut chart for stake allocation in arbitrage situations."""
+    df = event_rows_df[["Bet On", "Suggested Bet ($)"]].dropna(subset=["Suggested Bet ($)"])
+    if df.empty:
+        return None
+
+    colors_list = [COLORS["accent"], COLORS["accent2"], COLORS["warning"], COLORS["danger"]]
+
+    fig = go.Figure(go.Pie(
+        labels=df["Bet On"],
+        values=df["Suggested Bet ($)"],
+        hole=0.55,
+        marker=dict(colors=colors_list[:len(df)], line=dict(color=COLORS["bg"], width=2)),
+        textinfo="label+percent",
+        textfont=dict(size=11, color=COLORS["text"]),
+        hovertemplate="<b>%{label}</b><br>Stake: $%{value:.2f}<br>(%{percent})<extra></extra>",
+    ))
+
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text=f"Stake Split (${bankroll:.0f})", font_size=13, font_color=COLORS["text_muted"]),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font_size=10),
+        height=280,
+        annotations=[dict(
+            text=f"${bankroll:.0f}", x=0.5, y=0.5, font_size=18,
+            font_color=COLORS["text"], showarrow=False,
+            font=dict(family="Syne", weight=700),
+        )],
+    )
+    return fig
+
+
+def chart_efficiency_gauge(efficiency: float) -> go.Figure:
+    if efficiency < 1.0:
+        gauge_color = COLORS["arb_green"]
+        label = "ARBITRAGE"
+    elif efficiency < 1.015:
+        gauge_color = COLORS["warning"]
+        label = "NEAR ARB"
+    else:
+        gauge_color = COLORS["accent2"]
+        label = "NORMAL"
+
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=efficiency,
+        number=dict(
+            suffix="",
+            valueformat=".4f",
+            font=dict(size=22, color=COLORS["text"], family="IBM Plex Mono"),
+        ),
+        gauge=dict(
+            axis=dict(
+                range=[0.96, 1.08],
+                tickwidth=1,
+                tickcolor=COLORS["border"],
+                tickfont=dict(color=COLORS["text_muted"], size=9),
+                nticks=7,
+            ),
+            bar=dict(color=gauge_color, thickness=0.22),
+            bgcolor=COLORS["surface2"],
+            borderwidth=0,
+            steps=[
+                dict(range=[0.96, 1.0], color="rgba(0,229,160,0.12)"),
+                dict(range=[1.0, 1.015], color="rgba(245,166,35,0.10)"),
+                dict(range=[1.015, 1.08], color="rgba(61,155,255,0.06)"),
+            ],
+            threshold=dict(
+                line=dict(color=COLORS["arb_green"], width=2),
+                thickness=0.8, value=1.0,
+            ),
+        ),
+        title=dict(
+            text=f"<b>{label}</b>",
+            font=dict(size=11, color=gauge_color, family="Syne"),
+        ),
+        domain=dict(x=[0, 1], y=[0, 1]),
+    ))
+
+    layout = {
+        **PLOTLY_LAYOUT,
+        "height": 220,
+        "margin": dict(l=20, r=20, t=40, b=10),
+    }
+
+    fig.update_layout(**layout)
+    return fig
+
+
+def chart_roi_scatter(event_df: pd.DataFrame) -> go.Figure:
+    """Scatter: efficiency vs. ROI for arbitrage games."""
+    df = event_df[event_df["Guaranteed Profit"] == "Yes"].dropna(subset=["Return (%)"])
+    if df.empty:
+        return None
+
+    short_names = [g[:22] + "…" if len(g) > 22 else g for g in df["Game"]]
+
+    fig = go.Figure(go.Scatter(
+        x=df["Market Efficiency"],
+        y=df["Return (%)"],
+        mode="markers+text",
+        text=short_names,
+        textposition="top center",
+        textfont=dict(size=9, color=COLORS["text_muted"]),
+        marker=dict(
+            size=12,
+            color=df["Return (%)"],
+            colorscale=[[0, COLORS["accent2"]], [1, COLORS["arb_green"]]],
+            showscale=False,
+            line=dict(color=COLORS["border"], width=1),
+        ),
+        hovertemplate="<b>%{text}</b><br>Efficiency: %{x:.4f}<br>ROI: %{y:.2f}%<extra></extra>",
+    ))
+
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="Arbitrage Opportunities — Efficiency vs. ROI", font_size=13, font_color=COLORS["text_muted"]),
+        xaxis=dict(showgrid=True, gridcolor=COLORS["border"], title="Market Efficiency", title_font_size=10, tickfont_size=10),
+        yaxis=dict(showgrid=True, gridcolor=COLORS["border"], title="ROI (%)", title_font_size=10, tickfont_size=10),
+        height=320,
+    )
+    return fig
+
+
+# ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 
 available_sports = load_sports()
 
-common_sports = [
-    "NBA",
-    "NFL",
-    "MLB",
-    "NHL",
-    "English Premier League",
-    "NCAAB",
-    "NCAAF",
-]
-
-sport_options = [sport for sport in common_sports if sport in available_sports]
-remaining_sports = [sport for sport in available_sports if sport not in sport_options]
-sport_options.extend(remaining_sports)
+common_sports = ["NBA", "NFL", "MLB", "NHL", "English Premier League", "NCAAB", "NCAAF"]
+sport_options = [s for s in common_sports if s in available_sports]
+sport_options += [s for s in available_sports if s not in sport_options]
 
 with st.sidebar:
-    st.header("Choose what to analyze")
+    st.markdown("## ⚡ BetScan")
+    st.markdown("---")
 
     sport_title = st.selectbox("Sport", sport_options)
     sport_key = available_sports[sport_title]
@@ -366,53 +806,35 @@ with st.sidebar:
     region_display = st.selectbox(
         "Sportsbook region",
         ["United States", "United Kingdom", "Europe", "Australia"],
-        index=0,
     )
-    region_map = {
-        "United States": "us",
-        "United Kingdom": "uk",
-        "Europe": "eu",
-        "Australia": "au",
-    }
+    region_map = {"United States": "us", "United Kingdom": "uk", "Europe": "eu", "Australia": "au"}
     region = region_map[region_display]
 
-    bankroll = st.number_input(
-        "Budget per game ($)",
-        min_value=1.0,
-        value=100.0,
-        step=10.0,
-    )
+    bankroll = st.number_input("Budget per game ($)", min_value=1.0, value=100.0, step=10.0)
 
-    view_mode = st.radio("View", ["Simple", "Advanced"], horizontal=True)
+    st.markdown("---")
 
+    view_mode = st.radio("View mode", ["Simple", "Advanced"], horizontal=True)
     show_only_arbitrage = st.checkbox("Show only arbitrage opportunities", value=False)
 
     if view_mode == "Advanced":
-        max_efficiency = st.slider(
-            "Maximum market efficiency",
-            min_value=1.00,
-            max_value=1.10,
-            value=1.03,
-            step=0.001,
-            help="Closer to 1.00 means better pricing.",
-        )
-        top_n = st.slider(
-            "How many games to show",
-            min_value=5,
-            max_value=100,
-            value=15,
-            step=5,
-        )
+        max_efficiency = st.slider("Max market efficiency", 1.00, 1.10, 1.03, 0.001,
+                                   help="Lower = better value. Arbitrage < 1.000")
+        top_n = st.slider("Games to show", 5, 100, 15, 5)
     else:
         max_efficiency = 1.03
         top_n = 10
 
-    refresh = st.button("Refresh data", use_container_width=True)
+    st.markdown("---")
+    refresh = st.button("↻ Refresh data", use_container_width=True)
 
 if refresh:
     st.cache_data.clear()
 
-with st.spinner("Loading odds and finding the best opportunities..."):
+
+# ─── LOAD DATA ────────────────────────────────────────────────────────────────
+
+with st.spinner("Scanning sportsbooks for value…"):
     try:
         all_analyses, detail_df, event_df = load_data(sport_key, market, region, bankroll)
     except Exception as e:
@@ -420,12 +842,10 @@ with st.spinner("Loading odds and finding the best opportunities..."):
         st.stop()
 
 if event_df.empty:
-    st.warning("No complete games were returned for these settings.")
+    st.warning("No games were returned for these settings.")
     st.stop()
 
-filtered_event_df = event_df.copy()
-filtered_event_df = filtered_event_df[filtered_event_df["Market Efficiency"] <= max_efficiency]
-
+filtered_event_df = event_df[event_df["Market Efficiency"] <= max_efficiency].copy()
 if show_only_arbitrage:
     filtered_event_df = filtered_event_df[filtered_event_df["Guaranteed Profit"] == "Yes"]
 
@@ -439,38 +859,56 @@ detailed_export_df = export_detailed_csv("betting_opportunities_detailed.csv", f
 
 best_efficiency = float(filtered_event_df["Market Efficiency"].min()) if not filtered_event_df.empty else None
 arb_count = int((filtered_event_df["Guaranteed Profit"] == "Yes").sum())
+best_roi_row = filtered_event_df[filtered_event_df["Return (%)"].notna()].sort_values("Return (%)", ascending=False)
+best_roi = float(best_roi_row.iloc[0]["Return (%)"]) if not best_roi_row.empty else None
 
-st.subheader("Quick summary")
-c1, c2, c3 = st.columns(3)
-c1.metric("Games analyzed", len(event_df))
-c2.metric("Guaranteed profit games", arb_count)
-c3.metric(
-    "Best market efficiency",
-    f"{best_efficiency:.4f}" if best_efficiency is not None else "No data"
-)
 
-with st.expander("How to read this page"):
-    st.write(
-        "If a game shows guaranteed profit, the app found prices across sportsbooks "
-        "that may allow a profit no matter the outcome."
-    )
-    st.write(
-        "The most important numbers are the game, the return percentage, the profit, "
-        "and the sportsbook with the best price."
-    )
+# ─── HEADER ───────────────────────────────────────────────────────────────────
 
-arb_df = filtered_event_df[filtered_event_df["Guaranteed Profit"] == "Yes"].sort_values(
-    "Return (%)", ascending=False
-)
+st.markdown("""
+<div class="header-bar">
+  <h1>BetScan</h1>
+  <span class="header-tag">Live Odds</span>
+</div>
+""", unsafe_allow_html=True)
+st.caption("Real-time arbitrage detection across major sportsbooks. Data refreshes every 60 seconds.")
+
+st.markdown("---")
+
+# ── KPI ROW ──
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Games Scanned", len(event_df))
+c2.metric("Arbitrage Found", arb_count, delta="guaranteed" if arb_count > 0 else None)
+c3.metric("Best Efficiency", f"{best_efficiency:.4f}" if best_efficiency else "—")
+c4.metric("Best ROI", f"{best_roi:.2f}%" if best_roi else "—")
+
+st.markdown("")
+
+
+# ─── MARKET EFFICIENCY CHART ──────────────────────────────────────────────────
+
+with st.expander("📊 Market Efficiency Ranking — all games", expanded=True):
+    fig_rank = chart_efficiency_ranking(event_df, top_n=min(top_n, len(event_df)))
+    st.plotly_chart(fig_rank, use_container_width=True, config={"displayModeBar": False})
+
+    if arb_count > 0:
+        scatter_fig = chart_roi_scatter(event_df)
+        if scatter_fig:
+            st.plotly_chart(scatter_fig, use_container_width=True, config={"displayModeBar": False})
+
+
+# ─── TOP GAMES TABLE ──────────────────────────────────────────────────────────
+
+arb_df = filtered_event_df[filtered_event_df["Guaranteed Profit"] == "Yes"].sort_values("Return (%)", ascending=False)
 
 st.subheader("Top Games Right Now")
 
 if arb_df.empty:
     closest_df = filtered_event_df.sort_values("Market Efficiency").head(top_n)
     if closest_df.empty:
-        st.info("No games match your filters.")
+        st.info("No games match your current filters.")
     else:
-        st.info("No guaranteed-profit games were found right now. Here are the closest opportunities.")
+        st.info("No guaranteed-profit games found. Showing closest opportunities.")
         st.dataframe(closest_df, use_container_width=True, hide_index=True)
 else:
     top_display_df = arb_df.head(top_n)
@@ -479,37 +917,34 @@ else:
     best = top_display_df.iloc[0]
     if pd.notna(best["Return (%)"]) and pd.notna(best["Profit ($)"]):
         st.success(
-            f"Best opportunity right now: **{best['Game']}** | "
-            f"Expected return: **{best['Return (%)']:.2f}%** | "
-            f"Estimated profit: **${best['Profit ($)']:.2f}**"
+            f"⚡ Best right now: **{best['Game']}** · "
+            f"Return: **{best['Return (%)']:.2f}%** · "
+            f"Profit: **${best['Profit ($)']:.2f}**"
         )
 
-st.subheader("Summary View")
+st.markdown("---")
 
-summary_display_df = summary_export_df.copy()
 
-summary_display_df = summary_display_df.rename(columns={
-    "event": "Game",
-    "sport": "Sport",
-    "commence_time": "Start Time",
-    "implied_prob_sum": "Market Efficiency",
-    "arbitrage": "Guaranteed Profit",
-    "profit": "Profit ($)",
-    "roi": "Return (%)",
-    "best_outcome": "Best Team / Side",
-    "best_bookmaker": "Best Sportsbook",
-    "best_american_odds": "Best American Odds",
-    "best_decimal_odds": "Best Decimal Odds",
-})
+# ─── SUMMARY VIEW ─────────────────────────────────────────────────────────────
 
-st.dataframe(summary_display_df, use_container_width=True, hide_index=True)
+with st.expander("📋 Summary View — all filtered games"):
+    summary_display_df = summary_export_df.rename(columns={
+        "event": "Game", "sport": "Sport", "commence_time": "Start Time",
+        "implied_prob_sum": "Market Efficiency", "arbitrage": "Guaranteed Profit",
+        "profit": "Profit ($)", "roi": "Return (%)", "best_outcome": "Best Team / Side",
+        "best_bookmaker": "Best Sportsbook", "best_american_odds": "Best American Odds",
+        "best_decimal_odds": "Best Decimal Odds",
+    })
+    st.dataframe(summary_display_df, use_container_width=True, hide_index=True)
+
+
+# ─── GAME BREAKDOWN ───────────────────────────────────────────────────────────
 
 st.subheader("Game Breakdown")
 
 if matching_games:
     preferred_games = (
-        arb_df["Game"].tolist()
-        if not arb_df.empty
+        arb_df["Game"].tolist() if not arb_df.empty
         else filtered_event_df.sort_values("Market Efficiency")["Game"].tolist()
     )
 
@@ -518,184 +953,152 @@ if matching_games:
     event_rows = display_detail_df[display_detail_df["Game"] == selected_game].copy()
     event_summary = filtered_event_df[filtered_event_df["Game"] == selected_game].iloc[0]
 
-    left, right = st.columns([1.2, 1])
+    efficiency_val = float(event_summary["Market Efficiency"])
+    commence_time = event_summary.get("Start Time") or ""
+    is_live = is_live_event(str(commence_time))
+    profit_val = event_summary["Profit ($)"]
+    roi_val = event_summary["Return (%)"]
+
+    # ── Top info bar ──
+    badge_html = efficiency_badge(efficiency_val)
+    live_html = (
+        '<div class="live-indicator"><span class="live-dot"></span> LIVE</div>'
+        if is_live else ""
+    )
+    st.markdown(f"""
+    <div class="game-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div>
+          <span class="section-label">Selected Game</span>
+          <div style="font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; color:var(--text);">
+            {selected_game}
+          </div>
+          <div style="font-size:0.75rem; color:var(--muted); margin-top:4px;">
+            {event_summary['Sport']} · {format_market_label(market)}
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+          {live_html}
+          {badge_html}
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Charts row ──
+    ch1, ch2, ch3 = st.columns([2.2, 2.2, 1.6])
+
+    with ch1:
+        fig_odds = chart_odds_comparison(event_rows, selected_game)
+        st.plotly_chart(fig_odds, use_container_width=True, config={"displayModeBar": False})
+
+    with ch2:
+        pie_fig = chart_stake_pie(event_rows, bankroll)
+        if pie_fig:
+            st.plotly_chart(pie_fig, use_container_width=True, config={"displayModeBar": False})
+        else:
+            st.info("Stake split only shown for arbitrage games.")
+
+    with ch3:
+        gauge_fig = chart_efficiency_gauge(efficiency_val)
+        st.plotly_chart(gauge_fig, use_container_width=True, config={"displayModeBar": False})
+
+    # ── Detail table + sidebar panel ──
+    left, right = st.columns([1.5, 1])
 
     simple_cols = ["Bet On", "Sportsbook", "American Odds", "Decimal Odds"]
-
     if "Suggested Bet ($)" in event_rows.columns and event_rows["Suggested Bet ($)"].notna().any():
         simple_cols.append("Suggested Bet ($)")
-
-    # Show direct link if available
     if "Direct Link" in event_rows.columns:
         simple_cols.append("Direct Link")
 
     with left:
-        st.markdown("### 📊 Best Prices")
+        st.markdown("##### Best Prices")
+        st.dataframe(event_rows[simple_cols], use_container_width=True, hide_index=True)
 
-        st.dataframe(
-            event_rows[simple_cols],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        st.markdown("---")
-
-        st.markdown("### 💡 Quick Insight")
-
-        if pd.notna(event_summary["Return (%)"]):
-            st.success(
-                f"Expected return: {event_summary['Return (%)']:.2f}% "
-                f"(${event_summary['Profit ($)']:.2f} profit)"
-            )
+        st.markdown("")
+        if pd.notna(roi_val):
+            st.success(f"Expected return: **{roi_val:.2f}%** · Estimated profit: **${profit_val:.2f}**")
         else:
             st.info("No guaranteed arbitrage opportunity for this game.")
 
     with right:
-        st.markdown("### Summary")
+        st.markdown("##### Links & Info")
+        m1, m2 = st.columns(2)
+        with m1:
+            st.metric(f"Profit (${bankroll:.0f})", f"${profit_val:.2f}" if pd.notna(profit_val) else "N/A")
+        with m2:
+            st.metric("Return", f"{roi_val:.2f}%" if pd.notna(roi_val) else "N/A")
 
-        # Get the correct commence time for the currently selected game
-        commence_time = (event_summary.get("Start Time") 
-                        or event_summary.get("commence_time") 
-                        or "")
+        st.markdown("")
+        st.link_button("Open matchup news", build_game_info_link(selected_game), use_container_width=True)
+        st.link_button("Search odds info", build_general_odds_info_link(selected_game), use_container_width=True)
 
-        # Check if THIS specific game is live
-        is_current_game_live = is_live_event(commence_time)
-
-        # Show live badge only for the current game
-        if is_current_game_live:
-            st.markdown(live_badge(True), unsafe_allow_html=True)
-        else:
-            st.markdown(live_badge(False), unsafe_allow_html=True)  # clears previous badge
-
-                # Force clear any previous live badge
-        st.markdown("<div style='height: 0; margin: 0;'></div>", unsafe_allow_html=True)
-
-        st.write(f"**Game:** {event_summary['Game']}")
-        st.write(f"**Sport:** {event_summary['Sport']}")
-        st.write(f"**Market:** {format_market_label(market)}")
-        st.write(f"**Guaranteed Profit:** {event_summary['Guaranteed Profit']}")
-
-        profit = event_summary["Profit ($)"]
-        roi = event_summary["Return (%)"]
-
-        col_a, col_b = st.columns(2)
-
-        with col_a:
-            st.metric(
-                label=f"Profit (on ${bankroll:.0f})",
-                value=f"${profit:.2f}" if pd.notna(profit) else "N/A"
-            )
-
-        with col_b:
-            st.metric(
-                label="Return",
-                value=f"{roi:.2f}%" if pd.notna(roi) else "N/A"
-            )
-
-        st.markdown("### Learn more")
-        game_info_link = build_game_info_link(selected_game)
-        general_odds_link = build_general_odds_info_link(selected_game)
-
-        st.link_button(
-            label="Open matchup info and news",
-            url=game_info_link,
-            use_container_width=True,
-        )
-        st.link_button(
-            label="Search general odds info",
-            url=general_odds_link,
-            use_container_width=True,
-        )
-
+        st.markdown("")
+        st.markdown('<span class="section-label">Sportsbooks</span>', unsafe_allow_html=True)
         sportsbooks_used = event_rows["Sportsbook"].dropna().unique().tolist()
-
-        if sportsbooks_used:
-            st.markdown("### Best prices found at")
-
-            for book in sportsbooks_used:
-                normalized = normalize_book_name(book)
-
-                # Find raw link from API
-                direct_link = None
-                for analysis in filtered_analyses:
-                    if analysis.get("event") == selected_game:
-                        for res in analysis.get("results", []):
-                            if res.get("bookmaker") == book:
-                                direct_link = res.get("link")
-                                break
-                        if direct_link:
+        for book in sportsbooks_used:
+            normalized = normalize_book_name(book)
+            direct_link = None
+            for analysis in filtered_analyses:
+                if analysis.get("event") == selected_game:
+                    for res in analysis.get("results", []):
+                        if res.get("bookmaker") == book:
+                            direct_link = res.get("link")
                             break
-
-                # Clean the link
-                cleaned_link = clean_bookmaker_link(direct_link, normalized)
-
-                if cleaned_link and cleaned_link.startswith("http"):
-                    st.link_button(
-                        label=f"→ {normalized} (Direct to Match)",
-                        url=cleaned_link,
-                        use_container_width=True,
-                    )
+                    if direct_link:
+                        break
+            cleaned_link = clean_bookmaker_link(direct_link, normalized)
+            if cleaned_link and cleaned_link.startswith("http"):
+                st.link_button(f"→ {normalized}", cleaned_link, use_container_width=True)
+            else:
+                homepage = BOOK_LINKS.get(normalized)
+                if homepage:
+                    st.link_button(f"{normalized} (Home)", homepage, use_container_width=True)
                 else:
-                    # Fallback to homepage for BetMGM and other problematic links
-                    homepage = BOOK_LINKS.get(normalized)
-                    if homepage:
-                        st.link_button(
-                            label=f"{normalized} (Homepage)",
-                            url=homepage,
-                            use_container_width=True,
-                        )
-                    else:
-                        st.write(normalized)
+                    st.write(normalized)
 
-    st.caption("Direct links are provided by the bookmaker when available. Some books (like BetMGM) often only allow homepage links.")
+    st.caption("Direct links are provided by the bookmaker when available.")
 
 else:
     st.info("No games match the current filters.")
 
-with st.expander("Show all filtered results"):
+st.markdown("---")
+
+
+# ─── ALL RESULTS EXPANDER ────────────────────────────────────────────────────
+
+with st.expander("🗂 Show all filtered results"):
     if display_detail_df.empty:
         st.info("No results to show.")
     else:
         useful_cols = [
-            "Game",
-            "Sport",
-            "Bet On",
-            "Sportsbook",
-            "American Odds",
-            "Decimal Odds",
-            "Suggested Bet ($)",
-            "Profit ($)",
-            "Return (%)",
-            "Guaranteed Profit",
+            "Game", "Sport", "Bet On", "Sportsbook", "American Odds", "Decimal Odds",
+            "Suggested Bet ($)", "Profit ($)", "Return (%)", "Guaranteed Profit",
         ]
-        existing_cols = [col for col in useful_cols if col in display_detail_df.columns]
+        existing_cols = [c for c in useful_cols if c in display_detail_df.columns]
         st.dataframe(
-            display_detail_df[existing_cols].sort_values(["Game", "Decimal Odds"], ascending=[True, False]),
-            use_container_width=True,
-            hide_index=True,
+            display_detail_df[existing_cols].sort_values(
+                ["Game", "Decimal Odds"], ascending=[True, False]
+            ),
+            use_container_width=True, hide_index=True,
         )
 
-summary_csv_bytes = summary_export_df.to_csv(index=False).encode("utf-8")
-detailed_csv_bytes = detailed_export_df.to_csv(index=False).encode("utf-8")
-
 st.subheader("Download Data")
-
 col1, col2 = st.columns(2)
-
 with col1:
     st.download_button(
-        label="Download summary CSV",
-        data=summary_csv_bytes,
-        file_name="betting_opportunities_summary.csv",
-        mime="text/csv",
+        "↓ Summary CSV",
+        summary_export_df.to_csv(index=False).encode("utf-8"),
+        "betting_opportunities_summary.csv",
+        "text/csv",
         use_container_width=True,
     )
-
 with col2:
     st.download_button(
-        label="Download detailed CSV",
-        data=detailed_csv_bytes,
-        file_name="betting_opportunities_detailed.csv",
-        mime="text/csv",
+        "↓ Detailed CSV",
+        detailed_export_df.to_csv(index=False).encode("utf-8"),
+        "betting_opportunities_detailed.csv",
+        "text/csv",
         use_container_width=True,
-    )   
+    )

@@ -1,8 +1,13 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-Carolina Hurricanes vs Ottawa Senators,NHL,2026-04-05T21:08:28Z,0.993,True,0.7,0.7,Ottawa Senators,BetMGM,170,2.7
-Washington Capitals vs New York Rangers,NHL,2026-04-05T23:10:00Z,1.0189,False,,,New York Rangers,BetMGM,125,2.25
-St Louis Blues vs Colorado Avalanche,NHL,2026-04-06T01:45:00Z,1.0181,False,,,Colorado Avalanche,LowVig.ag,130,2.3
-Tampa Bay Lightning vs Buffalo Sabres,NHL,2026-04-06T23:00:00Z,0.625,True,60.0,60.0,Buffalo Sabres,BetMGM,220,3.2
-Seattle Kraken vs Winnipeg Jets,NHL,2026-04-06T23:30:00Z,1.0058,False,,,Winnipeg Jets,LowVig.ag,161,2.61
-Chicago Blackhawks vs San Jose Sharks,NHL,2026-04-07T02:00:00Z,1.0267,False,,,San Jose Sharks,DraftKings,164,2.64
-Nashville Predators vs Los Angeles Kings,NHL,2026-04-07T02:30:00Z,1.0153,False,,,Los Angeles Kings,BetUS,196,2.96
+St. Louis Cardinals vs Detroit Tigers,MLB,2026-04-05T23:21:00Z,0.944,True,5.93,5.93,Detroit Tigers,FanDuel,320,4.2
+Chicago Cubs vs Tampa Bay Rays,MLB,2026-04-06T20:11:00Z,1.0096,False,,,Tampa Bay Rays,BetOnline.ag,102,2.02
+Kansas City Royals vs Cleveland Guardians,MLB,2026-04-06T22:11:00Z,1.0238,False,,,Kansas City Royals,BetOnline.ag,100,2.0
+Cincinnati Reds vs Miami Marlins,MLB,2026-04-06T22:41:00Z,1.0086,False,,,Cincinnati Reds,BetUS,114,2.14
+San Diego Padres vs Pittsburgh Pirates,MLB,2026-04-06T22:41:00Z,1.0198,False,,,San Diego Padres,LowVig.ag,109,2.09
+Milwaukee Brewers vs Boston Red Sox,MLB,2026-04-06T22:46:00Z,1.0171,False,,,Boston Red Sox,BetMGM,-102,1.9804
+St. Louis Cardinals vs Washington Nationals,MLB,2026-04-06T22:46:00Z,1.0244,False,,,Washington Nationals,LowVig.ag,-104,1.9615
+Los Angeles Dodgers vs Toronto Blue Jays,MLB,2026-04-06T23:08:00Z,1.0239,False,,,Toronto Blue Jays,LowVig.ag,118,2.18
+Detroit Tigers vs Minnesota Twins,MLB,2026-04-06T23:41:00Z,1.0157,False,,,Detroit Tigers,FanDuel,108,2.08
+Seattle Mariners vs Texas Rangers,MLB,2026-04-07T00:06:00Z,1.0068,False,,,Seattle Mariners,LowVig.ag,109,2.09
+Houston Astros vs Colorado Rockies,MLB,2026-04-07T00:41:00Z,1.0127,False,,,Colorado Rockies,DraftKings,189,2.89
+Philadelphia Phillies vs San Francisco Giants,MLB,2026-04-07T01:46:00Z,1.0283,False,,,San Francisco Giants,DraftKings,100,2.0
