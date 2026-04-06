@@ -1,13 +1,6 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-St. Louis Cardinals vs Detroit Tigers,MLB,2026-04-05T23:21:00Z,0.944,True,5.93,5.93,Detroit Tigers,FanDuel,320,4.2
-Chicago Cubs vs Tampa Bay Rays,MLB,2026-04-06T20:11:00Z,1.0096,False,,,Tampa Bay Rays,BetOnline.ag,102,2.02
-Kansas City Royals vs Cleveland Guardians,MLB,2026-04-06T22:11:00Z,1.0238,False,,,Kansas City Royals,BetOnline.ag,100,2.0
-Cincinnati Reds vs Miami Marlins,MLB,2026-04-06T22:41:00Z,1.0086,False,,,Cincinnati Reds,BetUS,114,2.14
-San Diego Padres vs Pittsburgh Pirates,MLB,2026-04-06T22:41:00Z,1.0198,False,,,San Diego Padres,LowVig.ag,109,2.09
-Milwaukee Brewers vs Boston Red Sox,MLB,2026-04-06T22:46:00Z,1.0171,False,,,Boston Red Sox,BetMGM,-102,1.9804
-St. Louis Cardinals vs Washington Nationals,MLB,2026-04-06T22:46:00Z,1.0244,False,,,Washington Nationals,LowVig.ag,-104,1.9615
-Los Angeles Dodgers vs Toronto Blue Jays,MLB,2026-04-06T23:08:00Z,1.0239,False,,,Toronto Blue Jays,LowVig.ag,118,2.18
-Detroit Tigers vs Minnesota Twins,MLB,2026-04-06T23:41:00Z,1.0157,False,,,Detroit Tigers,FanDuel,108,2.08
-Seattle Mariners vs Texas Rangers,MLB,2026-04-07T00:06:00Z,1.0068,False,,,Seattle Mariners,LowVig.ag,109,2.09
-Houston Astros vs Colorado Rockies,MLB,2026-04-07T00:41:00Z,1.0127,False,,,Colorado Rockies,DraftKings,189,2.89
-Philadelphia Phillies vs San Francisco Giants,MLB,2026-04-07T01:46:00Z,1.0283,False,,,San Francisco Giants,DraftKings,100,2.0
+New York Knicks vs Atlanta Hawks,NBA,2026-04-06T23:10:00Z,1.0172,False,,,New York Knicks,LowVig.ag,112,2.12
+Detroit Pistons vs Orlando Magic,NBA,2026-04-06T23:10:00Z,1.0237,False,,,Orlando Magic,FanDuel,136,2.36
+Cleveland Cavaliers vs Memphis Grizzlies,NBA,2026-04-07T00:10:00Z,1.0,True,0.0,0.0,Memphis Grizzlies,LowVig.ag,910,10.1
+Philadelphia 76ers vs San Antonio Spurs,NBA,2026-04-07T00:10:00Z,1.0246,False,,,Philadelphia 76ers,LowVig.ag,293,3.93
+Portland Trail Blazers vs Denver Nuggets,NBA,2026-04-07T01:10:00Z,1.0194,False,,,Portland Trail Blazers,Bovada,290,3.9

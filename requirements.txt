@@ -1,2 +1,6 @@
-requests
 python-dotenv
+requests
+streamlit
+plotly
+pandas
+numpy
