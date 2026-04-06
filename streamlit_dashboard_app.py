@@ -184,9 +184,7 @@ h2, h3 {{
     border-radius: 8px !important;
     overflow: hidden;
 }}
-.dvn-scroller {{
-    background: var(--surface) !important;
-}}
+/* NOTE: Do NOT override .dvn-scroller background — it hides text in the canvas renderer */
 
 /* ── BUTTONS ── */
 .stButton > button, .stDownloadButton > button {{
@@ -544,12 +542,19 @@ def normalize_book_name(name: str) -> str:
 
 
 def efficiency_badge(eff: float) -> str:
+    base = (
+        "display:inline-block; padding:3px 12px; border-radius:20px; "
+        "font-size:0.68rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;"
+    )
     if eff < 1.0:
-        return '<span class="badge badge-arb">⚡ Arbitrage</span>'
+        style = f"{base} background:rgba(0,229,160,0.15); color:#00e5a0; border:1px solid #00e5a0;"
+        return f'<span style="{style}">&#9889; Arbitrage</span>'
     elif eff < 1.015:
-        return '<span class="badge badge-close">◈ Near Arb</span>'
+        style = f"{base} background:rgba(245,166,35,0.12); color:#f5a623; border:1px solid #f5a623;"
+        return f'<span style="{style}">&#9670; Near Arb</span>'
     else:
-        return '<span class="badge badge-normal">◇ Normal</span>'
+        style = f"{base} background:rgba(107,118,148,0.15); color:#6b7694; border:1px solid #2a2f3e;"
+        return f'<span style="{style}">&#9671; Normal</span>'
 
 
 def build_game_info_link(game_name: str) -> str:
@@ -638,7 +643,6 @@ def chart_odds_comparison(event_rows_df: pd.DataFrame, game_name: str) -> go.Fig
 
     fig.update_layout(
         **PLOTLY_LAYOUT,
-        title=dict(text="Odds by Sportsbook", font_size=13, font_color=COLORS["text_muted"]),
         barmode="group",
         xaxis=dict(showgrid=False, tickfont_size=10, tickangle=-30),
         yaxis=dict(showgrid=True, gridcolor=COLORS["border"], gridwidth=0.5, zeroline=False, tickfont_size=10),
@@ -686,6 +690,7 @@ def chart_stake_pie(event_rows_df: pd.DataFrame, bankroll: float) -> go.Figure |
 
 
 def chart_efficiency_gauge(efficiency: float) -> go.Figure:
+    """Gauge / speedometer for a single game's market efficiency."""
     if efficiency < 1.0:
         gauge_color = COLORS["arb_green"]
         label = "ARBITRAGE"
@@ -732,13 +737,8 @@ def chart_efficiency_gauge(efficiency: float) -> go.Figure:
         domain=dict(x=[0, 1], y=[0, 1]),
     ))
 
-    layout = {
-        **PLOTLY_LAYOUT,
-        "height": 220,
-        "margin": dict(l=20, r=20, t=40, b=10),
-    }
-
-    fig.update_layout(**layout)
+    layout = {**PLOTLY_LAYOUT, "margin": dict(l=20, r=20, t=40, b=10)}
+    fig.update_layout(**layout, height=220)
     return fig
 
 
@@ -775,6 +775,80 @@ def chart_roi_scatter(event_df: pd.DataFrame) -> go.Figure:
         height=320,
     )
     return fig
+
+
+
+
+def build_prices_table(event_rows, bankroll):
+    import pandas as pd
+    has_stake = (
+        "Suggested Bet ($)" in event_rows.columns
+        and event_rows["Suggested Bet ($)"].notna().any()
+    )
+    has_link = (
+        "Direct Link" in event_rows.columns
+        and event_rows["Direct Link"].notna().any()
+    )
+    outcome_colors = ["#00e5a0", "#3d9bff", "#f5a623", "#ff5b5b"]
+    th = ("padding:10px 14px;text-align:left;font-size:0.62rem;text-transform:uppercase;"
+          "letter-spacing:0.1em;color:#6b7694;border-bottom:1px solid #2a2f3e;white-space:nowrap;")
+    td = "padding:11px 14px;font-size:0.82rem;color:#e8ecf3;border-bottom:1px solid #1e222d;white-space:nowrap;"
+    tn = td + "text-align:right;font-family:'IBM Plex Mono',monospace;"
+    rows_html = ""
+    for i, (_, row) in enumerate(event_rows.iterrows()):
+        outcome  = row.get("Bet On", "")
+        book     = row.get("Sportsbook", "")
+        am_odds  = row.get("American Odds", "")
+        dec_odds = row.get("Decimal Odds", "")
+        stake    = row.get("Suggested Bet ($)", None)
+        link     = row.get("Direct Link", None)
+        accent = outcome_colors[i % len(outcome_colors)]
+        bg = "#161922" if i % 2 == 0 else "#13161f"
+        try:
+            am_int = int(am_odds)
+            am_color = "#00e5a0" if am_int > 0 else "#e8ecf3"
+            am_prefix = "+" if am_int > 0 else ""
+        except (ValueError, TypeError):
+            am_int, am_color, am_prefix = None, "#e8ecf3", ""
+        try:
+            dec_str = f"{float(dec_odds):.4f}"
+        except (ValueError, TypeError):
+            dec_str = str(dec_odds)
+        try:
+            stake_str = f"${float(stake):.2f}" if stake is not None and str(stake) != "nan" else "&#8212;"
+        except (ValueError, TypeError):
+            stake_str = "&#8212;"
+        if link and str(link).startswith("http"):
+            link_cell = (f'<a href="{link}" target="_blank" style="display:inline-block;padding:3px 10px;'
+                         'border-radius:5px;background:rgba(61,155,255,0.1);border:1px solid #3d9bff;'
+                         'color:#3d9bff;font-size:0.7rem;text-decoration:none;text-transform:uppercase;">'
+                         'Bet &#8594;</a>')
+        else:
+            link_cell = '<span style="color:#6b7694;">&#8212;</span>'
+        stake_td = f'<td style="{tn}color:#f5a623;">{stake_str}</td>' if has_stake else ""
+        link_td  = f'<td style="{td}">{link_cell}</td>' if has_link else ""
+        rows_html += (
+            f'<tr style="background:{bg};">'
+            f'<td style="{td}border-left:3px solid {accent};font-weight:600;color:{accent};">{outcome}</td>'
+            f'<td style="{td}">{book}</td>'
+            f'<td style="{tn}color:{am_color};">{am_prefix}{am_odds}</td>'
+            f'<td style="{tn}">{dec_str}</td>'
+            f'{stake_td}{link_td}'
+            f'</tr>'
+        )
+    sh = f'<th style="{th}text-align:right;">Suggested Bet</th>' if has_stake else ""
+    lh = f'<th style="{th}">Place Bet</th>' if has_link else ""
+    return (
+        '<div style="border:1px solid #2a2f3e;border-radius:10px;overflow:hidden;width:100%;">'
+        '<table style="width:100%;border-collapse:collapse;">'
+        f'<thead><tr style="background:#1e222d;">'
+        f'<th style="{th}">Outcome</th><th style="{th}">Sportsbook</th>'
+        f'<th style="{th}text-align:right;">Amer. Odds</th>'
+        f'<th style="{th}text-align:right;">Dec. Odds</th>'
+        f'{sh}{lh}</tr></thead>'
+        f'<tbody>{rows_html}</tbody></table></div>'
+    )
+
 
 
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
@@ -962,28 +1036,27 @@ if matching_games:
     # ── Top info bar ──
     badge_html = efficiency_badge(efficiency_val)
     live_html = (
-        '<div class="live-indicator"><span class="live-dot"></span> LIVE</div>'
+        '<div style="display:inline-flex;align-items:center;gap:7px;font-weight:700;'
+        'color:#ff5b5b;font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase;">'
+        '<span style="width:9px;height:9px;background:#ff5b5b;border-radius:50%;display:inline-block;"></span>'
+        'LIVE</div>'
         if is_live else ""
     )
-    st.markdown(f"""
-    <div class="game-card">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div>
-          <span class="section-label">Selected Game</span>
-          <div style="font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; color:var(--text);">
-            {selected_game}
-          </div>
-          <div style="font-size:0.75rem; color:var(--muted); margin-top:4px;">
-            {event_summary['Sport']} · {format_market_label(market)}
-          </div>
-        </div>
-        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-          {live_html}
-          {badge_html}
-        </div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    game_card_html = (
+        '<div style="background:#161922;border:1px solid #2a2f3e;border-radius:10px;'
+        'padding:1rem 1.2rem;margin-bottom:0.75rem;">'
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+        '<div>'
+        '<span style="font-size:0.62rem;color:#6b7694;text-transform:uppercase;'
+        'letter-spacing:0.12em;display:block;margin-bottom:4px;">Selected Game</span>'
+        f'<div style="font-family:Syne,sans-serif;font-size:1.1rem;font-weight:700;color:#e8ecf3;">{selected_game}</div>'
+        f'<div style="font-size:0.75rem;color:#6b7694;margin-top:4px;">{event_summary["Sport"]} &middot; {format_market_label(market)}</div>'
+        '</div>'
+        f'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">{live_html}{badge_html}</div>'
+        '</div>'
+        '</div>'
+    )
+    st.markdown(game_card_html, unsafe_allow_html=True)
 
     # ── Charts row ──
     ch1, ch2, ch3 = st.columns([2.2, 2.2, 1.6])
@@ -1014,7 +1087,7 @@ if matching_games:
 
     with left:
         st.markdown("##### Best Prices")
-        st.dataframe(event_rows[simple_cols], use_container_width=True, hide_index=True)
+        st.markdown(build_prices_table(event_rows, bankroll), unsafe_allow_html=True)
 
         st.markdown("")
         if pd.notna(roi_val):
@@ -1083,6 +1156,9 @@ with st.expander("🗂 Show all filtered results"):
             ),
             use_container_width=True, hide_index=True,
         )
+
+
+# ─── DOWNLOAD ────────────────────────────────────────────────────────────────
 
 st.subheader("Download Data")
 col1, col2 = st.columns(2)

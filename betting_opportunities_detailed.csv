@@ -1,11 +1,11 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,outcome,bookmaker,american_odds,decimal_odds,stake
 New York Knicks vs Atlanta Hawks,NBA,2026-04-06T23:10:00Z,1.0172,False,,,Atlanta Hawks,BetMGM,-120,1.8333,
 New York Knicks vs Atlanta Hawks,NBA,2026-04-06T23:10:00Z,1.0172,False,,,New York Knicks,LowVig.ag,112,2.12,
-Detroit Pistons vs Orlando Magic,NBA,2026-04-06T23:10:00Z,1.0237,False,,,Detroit Pistons,Bovada,-150,1.6667,
-Detroit Pistons vs Orlando Magic,NBA,2026-04-06T23:10:00Z,1.0237,False,,,Orlando Magic,FanDuel,136,2.36,
-Cleveland Cavaliers vs Memphis Grizzlies,NBA,2026-04-07T00:10:00Z,1.0,True,0.0,0.0,Cleveland Cavaliers,BetRivers,-910,1.1099,90.1
-Cleveland Cavaliers vs Memphis Grizzlies,NBA,2026-04-07T00:10:00Z,1.0,True,0.0,0.0,Memphis Grizzlies,LowVig.ag,910,10.1,9.9
-Philadelphia 76ers vs San Antonio Spurs,NBA,2026-04-07T00:10:00Z,1.0246,False,,,Philadelphia 76ers,LowVig.ag,293,3.93,
-Philadelphia 76ers vs San Antonio Spurs,NBA,2026-04-07T00:10:00Z,1.0246,False,,,San Antonio Spurs,FanDuel,-335,1.2985,
+Detroit Pistons vs Orlando Magic,NBA,2026-04-06T23:10:00Z,1.0132,False,,,Detroit Pistons,Bovada,-150,1.6667,
+Detroit Pistons vs Orlando Magic,NBA,2026-04-06T23:10:00Z,1.0132,False,,,Orlando Magic,FanDuel,142,2.42,
+Cleveland Cavaliers vs Memphis Grizzlies,NBA,2026-04-07T00:10:00Z,1.0039,False,,,Cleveland Cavaliers,BetRivers,-910,1.1099,
+Cleveland Cavaliers vs Memphis Grizzlies,NBA,2026-04-07T00:10:00Z,1.0039,False,,,Memphis Grizzlies,LowVig.ag,872,9.72,
+Philadelphia 76ers vs San Antonio Spurs,NBA,2026-04-07T00:10:00Z,1.0272,False,,,Philadelphia 76ers,LowVig.ag,293,3.93,
+Philadelphia 76ers vs San Antonio Spurs,NBA,2026-04-07T00:10:00Z,1.0272,False,,,San Antonio Spurs,FanDuel,-340,1.2941,
 Portland Trail Blazers vs Denver Nuggets,NBA,2026-04-07T01:10:00Z,1.0194,False,,,Denver Nuggets,LowVig.ag,-322,1.3106,
 Portland Trail Blazers vs Denver Nuggets,NBA,2026-04-07T01:10:00Z,1.0194,False,,,Portland Trail Blazers,Bovada,290,3.9,
