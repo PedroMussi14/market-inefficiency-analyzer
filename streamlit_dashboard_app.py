@@ -111,6 +111,11 @@ section[data-testid="stSidebar"] {{
     border-right: 1px solid var(--border) !important;
     width: 290px !important;
 }}
+/* Hide Streamlit auto-injected page label/nav (e.g., script names like keyboard_double). */
+section[data-testid="stSidebar"] [data-testid="stSidebarHeader"],
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {{
+    display: none !important;
+}}
 section[data-testid="stSidebar"] * {{
     color: var(--text) !important;
     font-family: 'IBM Plex Mono', monospace !important;
