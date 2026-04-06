@@ -111,14 +111,33 @@ section[data-testid="stSidebar"] {{
     border-right: 1px solid var(--border) !important;
     width: 290px !important;
 }}
-/* Hide Streamlit auto-injected page label/nav (e.g., script names like keyboard_double). */
-section[data-testid="stSidebar"] [data-testid="stSidebarHeader"],
-section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {{
+/* Remove top spacer so the sidebar starts directly at BetScan and doesn't scroll from hidden chrome. */
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
+    padding-top: 0 !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
+    padding-top: 0 !important;
+}}
+section[data-testid="stSidebar"] button[data-testid="stSidebarCollapseButton"] {{
     display: none !important;
 }}
 section[data-testid="stSidebar"] * {{
     color: var(--text) !important;
     font-family: 'IBM Plex Mono', monospace !important;
+}}
+/* Keep Streamlit material icon ligatures from rendering as raw text. */
+section[data-testid="stSidebar"] [data-testid="stIconMaterial"] {{
+    font-family: "Material Symbols Rounded", "Material Symbols Outlined", sans-serif !important;
+    font-weight: normal !important;
+    font-style: normal !important;
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    white-space: nowrap !important;
+    direction: ltr !important;
+    -webkit-font-feature-settings: "liga" !important;
+    font-feature-settings: "liga" !important;
 }}
 section[data-testid="stSidebar"] .stSelectbox > div,
 section[data-testid="stSidebar"] .stNumberInput > div,
@@ -179,7 +198,7 @@ h2, h3 {{
 [data-testid="stMetricValue"] {{
     color: var(--accent) !important;
     font-family: 'Syne', sans-serif !important;
-    font-size: 1.8rem !important;
+    font-size: clamp(1.45rem, 3.2vw, 1.8rem) !important;    
     font-weight: 800 !important;
 }}
 
@@ -189,7 +208,13 @@ h2, h3 {{
     border-radius: 8px !important;
     overflow: hidden;
 }}
-/* NOTE: Do NOT override .dvn-scroller background — it hides text in the canvas renderer */
+
+[data-testid="stMetricValue"] > div {{
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.1 !important;
+}}
 
 /* ── BUTTONS ── */
 .stButton > button, .stDownloadButton > button {{
