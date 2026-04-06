@@ -24,6 +24,22 @@ def calculate_roi(bankroll, profit):
     return (profit / bankroll) * 100
 
 
+def _outcome_key(outcome, selected_market):
+    """
+    Build a stable key per betting outcome.
+
+    For spreads/totals, line ("point") must be part of the key or we can
+    accidentally combine incompatible lines and report false arbitrage.
+    """
+    name = outcome["name"]
+    point = outcome.get("point")
+
+    if selected_market in {"spreads", "totals"}:
+        return f"{name}|{point}", name, point
+
+    return name, name, point
+
+
 def get_best_odds_for_event(event, selected_market="h2h"):
     best_odds = {}
 
@@ -31,18 +47,22 @@ def get_best_odds_for_event(event, selected_market="h2h"):
         book_title = bookmaker.get("title", bookmaker.get("key", "Unknown"))
 
         for market in bookmaker.get("markets", []):
-            if market.get("key") not in ["h2h", "spreads", "totals"]:
+            market_key = market.get("key")
+            if market_key != selected_market:
                 continue
 
             for outcome in market.get("outcomes", []):
-                name = outcome["name"]
+                outcome_id, name, point = _outcome_key(outcome, selected_market)
                 american_price = outcome["price"]
                 decimal_price = american_to_decimal(american_price)
 
                 link = outcome.get("link") or market.get("link") or bookmaker.get("link")
 
-                if name not in best_odds or decimal_price > best_odds[name]["odds"]:
-                    best_odds[name] = {
+                if outcome_id not in best_odds or decimal_price > best_odds[outcome_id]["odds"]:
+                    best_odds[outcome_id] = {
+                        "outcome_id": outcome_id,
+                        "name": name,
+                        "point": point,
                         "bookmaker": book_title,
                         "american_odds": american_price,
                         "odds": decimal_price,
@@ -52,25 +72,26 @@ def get_best_odds_for_event(event, selected_market="h2h"):
     return best_odds
 
 
-def analyze_event(event, bankroll=100):
-    best_odds = get_best_odds_for_event(event, selected_market="h2h")
+def analyze_event(event, bankroll=100, selected_market="h2h"):
+    best_odds = get_best_odds_for_event(event, selected_market=selected_market)
 
     if len(best_odds) < 2:
         return None
 
-    outcome_names = list(best_odds.keys())
-    decimal_odds = [best_odds[name]["odds"] for name in outcome_names]
+    outcome_ids = list(best_odds.keys())
+    decimal_odds = [best_odds[outcome_id]["odds"] for outcome_id in outcome_ids]
     implied_prob_sum = sum(1 / odd for odd in decimal_odds)
     arb_exists = is_arbitrage(decimal_odds)
 
     results = []
-    for name in outcome_names:
+    for outcome_id in outcome_ids:
         results.append({
-            "outcome": name,
-            "bookmaker": best_odds[name]["bookmaker"],
-            "american_odds": best_odds[name]["american_odds"],
-            "decimal_odds": best_odds[name]["odds"],
-            "link": best_odds[name].get("link")   # ← NEW: Add link to each result
+            "outcome": best_odds[outcome_id]["name"],
+            "point": best_odds[outcome_id]["point"],
+            "bookmaker": best_odds[outcome_id]["bookmaker"],
+            "american_odds": best_odds[outcome_id]["american_odds"],
+            "decimal_odds": best_odds[outcome_id]["odds"],
+            "link": best_odds[outcome_id].get("link")
         })
 
     analysis = {

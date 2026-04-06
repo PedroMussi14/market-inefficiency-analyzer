@@ -142,7 +142,7 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float):
 
     all_analyses = []
     for event in events:
-        analysis = analyze_event(event, bankroll)
+        analysis = analyze_event(event, bankroll, selected_market=market)
         if analysis is not None:
             all_analyses.append(analysis)
 
