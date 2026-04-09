@@ -1,3 +1,4 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,outcome,bookmaker,american_odds,decimal_odds,stake
-Western Bulldogs vs Hawthorn Hawks,AFL,2026-04-11T09:35:41Z,0.9307,True,744.19,7.44,Hawthorn Hawks,BetUS,110,2.1,5116.28
-Western Bulldogs vs Hawthorn Hawks,AFL,2026-04-11T09:35:41Z,0.9307,True,744.19,7.44,Western Bulldogs,DraftKings,120,2.2,4883.72
+FC Nordsjaelland vs AGF Aarhus,Denmark Superliga,2026-04-10T17:00:00Z,1.0269,False,,,AGF Aarhus,BetMGM,-145,1.6897,
+FC Nordsjaelland vs AGF Aarhus,Denmark Superliga,2026-04-10T17:00:00Z,1.0269,False,,,FC Nordsjaelland,BetRivers,390,4.9,
+FC Nordsjaelland vs AGF Aarhus,Denmark Superliga,2026-04-10T17:00:00Z,1.0269,False,,,Draw,BetUS,333,4.33,
