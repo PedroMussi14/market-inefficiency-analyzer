@@ -1,2 +1,7 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-FC Nordsjaelland vs AGF Aarhus,Denmark Superliga,2026-04-10T17:00:00Z,1.0269,False,,,FC Nordsjaelland,BetRivers,390,4.9
+Chicago Bulls vs Washington Wizards,NBA,2026-04-09T23:10:00Z,1.0226,False,,,Washington Wizards,FanDuel,220,3.2
+Miami Heat vs Toronto Raptors,NBA,2026-04-09T23:10:00Z,1.0271,False,,,Miami Heat,FanDuel,142,2.42
+Boston Celtics vs New York Knicks,NBA,2026-04-09T23:40:00Z,1.0267,False,,,Boston Celtics,LowVig.ag,182,2.82
+Indiana Pacers vs Brooklyn Nets,NBA,2026-04-09T23:40:00Z,1.0149,False,,,Brooklyn Nets,LowVig.ag,141,2.41
+Philadelphia 76ers vs Houston Rockets,NBA,2026-04-10T00:10:00Z,1.0199,False,,,Philadelphia 76ers,Bovada,200,3.0
+Los Angeles Lakers vs Golden State Warriors,NBA,2026-04-10T02:10:00Z,1.0216,False,,,Los Angeles Lakers,DraftKings,120,2.2
