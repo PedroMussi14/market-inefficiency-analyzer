@@ -555,6 +555,40 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float) -> tupl
     return all_analyses, detail_df, event_df
 
 
+@st.cache_data(ttl=120)
+def load_all_arbitrage(market: str, region: str, bankroll: float) -> list:
+    """Scan EVERY available sport and return only arbitrage-positive analyses.
+
+    Iterates the full sports catalogue, fetching odds per sport and running
+    arbitrage detection on each event.  Sports that return an API error
+    (e.g. unsupported market/region combos) are silently skipped so the scan
+    always completes.
+
+    Result is cached for 2 minutes to balance freshness with API quota usage.
+    """
+    all_arb: list = []
+    sports = load_sports()
+
+    for sport_key in sports.values():
+        try:
+            events = get_odds(
+                sport=sport_key,
+                markets=market,
+                regions=region,
+                odds_format="american",
+                include_links=True,
+                include_sids=True,
+            )
+            for event in events:
+                analysis = analyze_event(event, bankroll, selected_market=market)
+                if analysis and analysis["arbitrage"]:
+                    all_arb.append(analysis)
+        except Exception:
+            continue  # skip unsupported sport / market combos
+
+    return sorted(all_arb, key=lambda x: x.get("roi") or 0, reverse=True)
+
+
 # =============================================================================
 # DataFrame Helpers
 # =============================================================================
@@ -1090,6 +1124,13 @@ with st.sidebar:
     st.markdown("## ⚡ BetScan")
     st.markdown("---")
 
+    page = st.radio(
+        "Page",
+        ["📊 Market Scanner", "⚡ All Arbitrage"],
+        label_visibility="collapsed",
+    )
+    st.markdown("---")
+
     sport_title = st.selectbox("Sport", sport_options)
     sport_key   = available_sports[sport_title]
 
@@ -1122,6 +1163,199 @@ with st.sidebar:
 # Clear cache on manual refresh so the next run fetches fresh API data
 if refresh:
     st.cache_data.clear()
+
+
+# =============================================================================
+# ALL ARBITRAGE PAGE
+# Scans every sport and renders guaranteed-profit opportunities cross-sport.
+# st.stop() ensures the Market Scanner section below never executes on this page.
+# =============================================================================
+
+if page == "⚡ All Arbitrage":
+
+    st.markdown("""
+    <div class="header-bar">
+      <h1>All Arbitrage</h1>
+      <span class="header-tag">Cross-Sport</span>
+    </div>
+    """, unsafe_allow_html=True)
+    st.caption(
+        "Every sport scanned simultaneously. Only guaranteed-profit opportunities are shown. "
+        "Cached for 2 minutes — hit Refresh to force a new scan."
+    )
+    st.markdown("---")
+
+    with st.spinner("Scanning all sports for arbitrage…"):
+        arb_all = load_all_arbitrage(market, region, bankroll)
+
+    if not arb_all:
+        st.info(
+            "No arbitrage opportunities found across any sport right now. "
+            "Markets are efficient — try a different market type or region."
+        )
+    else:
+        # ── KPI strip ────────────────────────────────────────────────────────
+        sports_with_arb = sorted({a["sport"] for a in arb_all if a.get("sport")})
+        best_roi_arb    = max(a["roi"] for a in arb_all if a.get("roi"))
+        best_profit_arb = max(a["profit"] for a in arb_all if a.get("profit"))
+
+        ka, kb, kc, kd = st.columns(4)
+        ka.metric("Opportunities",   len(arb_all))
+        kb.metric("Sports Affected", len(sports_with_arb))
+        kc.metric("Best ROI",        f"{best_roi_arb:.2f}%")
+        kd.metric("Best Profit",     f"${best_profit_arb:.2f}")
+
+        st.markdown("")
+
+        # ── Sport filter pills ───────────────────────────────────────────────
+        sport_filter = st.multiselect(
+            "Filter by sport",
+            options=sports_with_arb,
+            default=sports_with_arb,
+            key="arb_sport_filter",
+        )
+        filtered_arb = [a for a in arb_all if a.get("sport") in sport_filter]
+
+        st.markdown("")
+
+        if not filtered_arb:
+            st.info("No opportunities match the selected sports.")
+        else:
+            # ── Summary table ────────────────────────────────────────────────
+            summary_rows = []
+            for a in filtered_arb:
+                results = a.get("results", [])
+                books   = " · ".join(sorted({r["bookmaker"] for r in results}))
+                summary_rows.append({
+                    "Game":       a["event"],
+                    "Sport":      a["sport"],
+                    "Start Time": a["commence_time"],
+                    "ROI (%)":    round(a["roi"],    2) if a.get("roi")    else None,
+                    "Profit ($)": round(a["profit"], 2) if a.get("profit") else None,
+                    "Efficiency": round(a["implied_prob_sum"], 4),
+                    "Sportsbooks": books,
+                })
+            summary_tbl = pd.DataFrame(summary_rows)
+
+            st.subheader(f"Guaranteed-Profit Games ({len(filtered_arb)})")
+            st.dataframe(
+                summary_tbl.sort_values("ROI (%)", ascending=False),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            # Best single opportunity callout
+            best_arb = filtered_arb[0]
+            st.success(
+                f"⚡ Top pick: **{best_arb['event']}** ({best_arb['sport']}) · "
+                f"ROI **{best_arb['roi']:.2f}%** · "
+                f"Profit **${best_arb['profit']:.2f}**"
+            )
+
+            st.markdown("---")
+
+            # ── Per-game cards ───────────────────────────────────────────────
+            st.subheader("Game Breakdown")
+
+            for analysis in filtered_arb:
+                game         = analysis["event"]
+                sport_name   = analysis["sport"]
+                commence     = analysis.get("commence_time", "")
+                eff          = analysis["implied_prob_sum"]
+                roi_val      = analysis["roi"]
+                profit_val   = analysis["profit"]
+                results      = analysis.get("results", [])
+                is_live_now  = is_live_event(str(commence))
+
+                badge_html = efficiency_badge(eff)
+                live_html  = (
+                    '<span style="display:inline-flex;align-items:center;gap:6px;'
+                    'font-weight:700;color:#ff5b5b;font-size:0.78rem;letter-spacing:0.1em;'
+                    'text-transform:uppercase;">'
+                    '<span style="width:8px;height:8px;background:#ff5b5b;border-radius:50%;'
+                    'display:inline-block;"></span>LIVE</span>'
+                    if is_live_now else ""
+                )
+
+                # Card header
+                st.markdown(
+                    f'<div style="background:#161922;border:1px solid #2a2f3e;border-left:3px solid #00e5a0;'
+                    f'border-radius:10px;padding:1rem 1.2rem;margin-bottom:0.4rem;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+                    f'<div>'
+                    f'<span style="font-size:0.6rem;color:#6b7694;text-transform:uppercase;'
+                    f'letter-spacing:0.12em;display:block;margin-bottom:3px;">{sport_name} &middot; {format_market_label(market)}</span>'
+                    f'<div style="font-family:Syne,sans-serif;font-size:1.05rem;font-weight:700;color:#e8ecf3;">{game}</div>'
+                    f'<div style="font-size:0.72rem;color:#6b7694;margin-top:3px;">{commence}</div>'
+                    f'</div>'
+                    f'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">'
+                    f'{live_html}{badge_html}'
+                    f'<span style="font-size:0.9rem;font-weight:700;color:#00e5a0;">+{roi_val:.2f}% ROI</span>'
+                    f'<span style="font-size:0.78rem;color:#6b7694;">Profit: ${profit_val:.2f}</span>'
+                    f'</div></div></div>',
+                    unsafe_allow_html=True,
+                )
+
+                # Bet details — two columns: prices table | sportsbook links
+                col_left, col_right = st.columns([2, 1])
+
+                with col_left:
+                    # Build a lightweight detail DataFrame for the prices table helper
+                    fake_df_rows = []
+                    for r in results:
+                        fake_df_rows.append({
+                            "Bet On":            r["outcome"],
+                            "Sportsbook":        r["bookmaker"],
+                            "American Odds":     r["american_odds"],
+                            "Decimal Odds":      r["decimal_odds"],
+                            "Suggested Bet ($)": round(r["stake"], 2) if "stake" in r else None,
+                            "Direct Link":       r.get("link"),
+                        })
+                    fake_df = pd.DataFrame(fake_df_rows)
+                    st.markdown(build_prices_table(fake_df, bankroll), unsafe_allow_html=True)
+
+                with col_right:
+                    books_used = list({r["bookmaker"] for r in results})
+                    st.markdown(
+                        '<span class="section-label" style="margin-top:4px;display:block;">Sportsbooks</span>',
+                        unsafe_allow_html=True,
+                    )
+                    for book in books_used:
+                        norm = normalize_book_name(book)
+                        raw_link = next(
+                            (r.get("link") for r in results if r["bookmaker"] == book),
+                            None,
+                        )
+                        cleaned = clean_bookmaker_link(raw_link, norm)
+                        if cleaned:
+                            st.link_button(f"→ {norm}", cleaned, use_container_width=True)
+                        elif homepage := BOOK_LINKS.get(norm):
+                            st.link_button(f"{norm} (Home)", homepage, use_container_width=True)
+                        else:
+                            st.write(norm)
+
+                    st.markdown("")
+                    st.link_button(
+                        "🔍 Search odds",
+                        build_general_odds_info_link(game),
+                        use_container_width=True,
+                    )
+
+                st.markdown("")
+
+            # ── CSV download ─────────────────────────────────────────────────
+            st.markdown("---")
+            st.subheader("Download")
+            arb_export = export_summary_csv("arb_all_sports.csv", filtered_arb)
+            st.download_button(
+                "↓ Download All Arbitrage (CSV)",
+                arb_export.to_csv(index=False).encode("utf-8"),
+                "all_arbitrage_opportunities.csv",
+                "text/csv",
+                use_container_width=True,
+            )
+
+    st.stop()   # ← prevent the Market Scanner section from rendering
 
 
 # =============================================================================

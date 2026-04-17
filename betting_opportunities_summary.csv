@@ -1,7 +1,8 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-Chicago Bulls vs Washington Wizards,NBA,2026-04-09T23:10:00Z,1.0226,False,,,Washington Wizards,FanDuel,220,3.2
-Miami Heat vs Toronto Raptors,NBA,2026-04-09T23:10:00Z,1.0271,False,,,Miami Heat,FanDuel,142,2.42
-Boston Celtics vs New York Knicks,NBA,2026-04-09T23:40:00Z,1.0267,False,,,Boston Celtics,LowVig.ag,182,2.82
-Indiana Pacers vs Brooklyn Nets,NBA,2026-04-09T23:40:00Z,1.0149,False,,,Brooklyn Nets,LowVig.ag,141,2.41
-Philadelphia 76ers vs Houston Rockets,NBA,2026-04-10T00:10:00Z,1.0199,False,,,Philadelphia 76ers,Bovada,200,3.0
-Los Angeles Lakers vs Golden State Warriors,NBA,2026-04-10T02:10:00Z,1.0216,False,,,Los Angeles Lakers,DraftKings,120,2.2
+Orlando Magic vs Philadelphia 76ers,NBA,2026-04-15T23:40:47Z,1.0041,False,,,Orlando Magic,BetRivers,390,4.9
+Golden State Warriors vs Los Angeles Clippers,NBA,2026-04-16T02:12:00Z,1.0199,False,,,Golden State Warriors,Caesars,192,2.92
+Toronto Raptors vs Cleveland Cavaliers,NBA,2026-04-18T17:10:00Z,1.0299,False,,,Toronto Raptors,LowVig.ag,285,3.85
+Minnesota Timberwolves vs Denver Nuggets,NBA,2026-04-18T19:40:00Z,1.0233,False,,,Minnesota Timberwolves,Bovada,215,3.15
+Atlanta Hawks vs New York Knicks,NBA,2026-04-18T22:10:00Z,1.0194,False,,,Atlanta Hawks,LowVig.ag,188,2.88
+Houston Rockets vs Los Angeles Lakers,NBA,2026-04-19T00:40:00Z,1.0298,False,,,Los Angeles Lakers,LowVig.ag,188,2.88
+Portland Trail Blazers vs San Antonio Spurs,NBA,2026-04-20T01:10:00Z,1.018,False,,,Portland Trail Blazers,LowVig.ag,417,5.17
