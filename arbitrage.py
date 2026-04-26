@@ -236,6 +236,65 @@ def _attach_arbitrage_data(
     analysis["roi"]    = roi
 
 
+def find_ev_bets(event: dict, selected_market: str = "h2h") -> list:
+    """Return +EV bets by comparing every bookmaker against Pinnacle's sharp line.
+
+    Pinnacle's raw implied probabilities are de-vigged (normalised to sum to 1)
+    to estimate the true outcome probability.  Any bookmaker offering decimal odds
+    higher than 1 / true_prob represents a positive-expected-value bet.
+
+    Returns an empty list if Pinnacle is not present in the event's bookmakers.
+    """
+    pinnacle_decimals = {}
+    for bookmaker in event.get("bookmakers", []):
+        if "pinnacle" not in bookmaker.get("title", "").lower():
+            continue
+        for market in bookmaker.get("markets", []):
+            if market.get("key") != selected_market:
+                continue
+            for outcome in market.get("outcomes", []):
+                pinnacle_decimals[outcome["name"]] = american_to_decimal(outcome["price"])
+        break
+
+    if not pinnacle_decimals:
+        return []
+
+    # Remove Pinnacle's vig so probabilities sum to 1.0
+    raw_sum   = sum(1 / d for d in pinnacle_decimals.values())
+    true_probs = {name: (1 / d) / raw_sum for name, d in pinnacle_decimals.items()}
+
+    ev_bets = []
+    for bookmaker in event.get("bookmakers", []):
+        title = bookmaker.get("title", bookmaker.get("key", "Unknown"))
+        if "pinnacle" in title.lower():
+            continue
+        for market in bookmaker.get("markets", []):
+            if market.get("key") != selected_market:
+                continue
+            for outcome in market.get("outcomes", []):
+                name = outcome["name"]
+                if name not in true_probs:
+                    continue
+                decimal_odds = american_to_decimal(outcome["price"])
+                ev = decimal_odds * true_probs[name] - 1
+                if ev > 0:
+                    link = build_deep_link(title, outcome, market, bookmaker)
+                    ev_bets.append({
+                        "event":         f"{event.get('away_team')} vs {event.get('home_team')}",
+                        "sport":         event.get("sport_title"),
+                        "commence_time": event.get("commence_time"),
+                        "outcome":       name,
+                        "bookmaker":     title,
+                        "american_odds": outcome["price"],
+                        "decimal_odds":  round(decimal_odds, 4),
+                        "true_prob":     round(true_probs[name] * 100, 2),
+                        "ev_pct":        round(ev * 100, 2),
+                        "link":          link,
+                    })
+
+    return sorted(ev_bets, key=lambda x: x["ev_pct"], reverse=True)
+
+
 def analyze_event(
     event: dict,
     bankroll: float = 100,

@@ -1,8 +1,9 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-Orlando Magic vs Philadelphia 76ers,NBA,2026-04-15T23:40:47Z,1.0041,False,,,Orlando Magic,BetRivers,390,4.9
-Golden State Warriors vs Los Angeles Clippers,NBA,2026-04-16T02:12:00Z,1.0199,False,,,Golden State Warriors,Caesars,192,2.92
-Toronto Raptors vs Cleveland Cavaliers,NBA,2026-04-18T17:10:00Z,1.0299,False,,,Toronto Raptors,LowVig.ag,285,3.85
-Minnesota Timberwolves vs Denver Nuggets,NBA,2026-04-18T19:40:00Z,1.0233,False,,,Minnesota Timberwolves,Bovada,215,3.15
-Atlanta Hawks vs New York Knicks,NBA,2026-04-18T22:10:00Z,1.0194,False,,,Atlanta Hawks,LowVig.ag,188,2.88
-Houston Rockets vs Los Angeles Lakers,NBA,2026-04-19T00:40:00Z,1.0298,False,,,Los Angeles Lakers,LowVig.ag,188,2.88
-Portland Trail Blazers vs San Antonio Spurs,NBA,2026-04-20T01:10:00Z,1.018,False,,,Portland Trail Blazers,LowVig.ag,417,5.17
+New York Knicks vs Atlanta Hawks,NBA,2026-04-23T23:10:00Z,1.0299,False,,,Atlanta Hawks,DraftKings,102,2.02
+Cleveland Cavaliers vs Toronto Raptors,NBA,2026-04-24T00:10:00Z,1.0229,False,,,Toronto Raptors,FanDuel,132,2.32
+Denver Nuggets vs Minnesota Timberwolves,NBA,2026-04-24T01:30:00Z,1.0218,False,,,Minnesota Timberwolves,LowVig.ag,119,2.19
+Boston Celtics vs Philadelphia 76ers,NBA,2026-04-24T23:10:00Z,1.026,False,,,Philadelphia 76ers,Bovada,250,3.5
+Los Angeles Lakers vs Houston Rockets,NBA,2026-04-25T00:10:00Z,1.0258,False,,,Los Angeles Lakers,Caesars,320,4.2
+San Antonio Spurs vs Portland Trail Blazers,NBA,2026-04-25T02:40:00Z,1.0273,False,,,Portland Trail Blazers,FanDuel,112,2.12
+Detroit Pistons vs Orlando Magic,NBA,2026-04-25T17:10:00Z,1.0055,False,,,Orlando Magic,LowVig.ag,132,2.32
+Oklahoma City Thunder vs Phoenix Suns,NBA,2026-04-25T19:30:00Z,1.025,False,,,Phoenix Suns,LowVig.ag,364,4.64

@@ -16,11 +16,13 @@
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
+import streamlit.components.v1 as components
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote_plus
 from datetime import datetime, timezone
-from api_client import get_odds, get_sports
-from arbitrage import analyze_event
+from api_client import get_odds, get_sports, get_quota_info
+from arbitrage import analyze_event, find_ev_bets
 from exporter import (
     analyses_to_dataframe,
     export_detailed_csv,
@@ -402,6 +404,7 @@ hr {{
     height: 10px;
     background-color: var(--danger);
     border-radius: 50%;
+    position: relative;
     animation: pulse 1.8s infinite ease-in-out;
 }}
 .live-dot::after {{
@@ -518,8 +521,29 @@ def load_sports() -> dict:
     }
 
 
+def filter_event_bookmakers(events: list, excluded: set) -> list:
+    """Strip excluded bookmakers from each event before analysis."""
+    if not excluded:
+        return events
+    out = []
+    for event in events:
+        e = dict(event)
+        e["bookmakers"] = [
+            b for b in event.get("bookmakers", [])
+            if b.get("title", b.get("key", "")) not in excluded
+        ]
+        out.append(e)
+    return out
+
+
 @st.cache_data(ttl=60)
-def load_data(sport_key: str, market: str, region: str, bankroll: float) -> tuple:
+def load_data(
+    sport_key: str,
+    market: str,
+    region: str,
+    bankroll: float,
+    excluded_books: frozenset = frozenset(),
+) -> tuple:
     """Fetch live odds and run arbitrage analysis for every event.
 
     Result is cached for 60 seconds to reduce API usage while keeping data fresh.
@@ -542,6 +566,9 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float) -> tupl
     except Exception as e:
         raise Exception(f"This sport or market is not supported right now. API details: {e}") from e
 
+    if excluded_books:
+        events = filter_event_bookmakers(events, set(excluded_books))
+
     all_analyses = [
         analysis
         for event in events
@@ -555,38 +582,63 @@ def load_data(sport_key: str, market: str, region: str, bankroll: float) -> tupl
     return all_analyses, detail_df, event_df
 
 
+def _fetch_sport_arb(args: tuple) -> list:
+    """Fetch and analyse one sport for arbitrage. Used by the parallel all-arb scanner."""
+    sport_key, market, region, bankroll = args
+    try:
+        events = get_odds(
+            sport=sport_key, markets=market, regions=region,
+            odds_format="american", include_links=True, include_sids=True,
+        )
+        return [
+            analysis for event in events
+            if (analysis := analyze_event(event, bankroll, selected_market=market))
+            and analysis["arbitrage"]
+        ]
+    except Exception:
+        return []
+
+
 @st.cache_data(ttl=120)
 def load_all_arbitrage(market: str, region: str, bankroll: float) -> list:
-    """Scan EVERY available sport and return only arbitrage-positive analyses.
+    """Scan EVERY available sport in parallel and return arbitrage-positive analyses.
 
-    Iterates the full sports catalogue, fetching odds per sport and running
-    arbitrage detection on each event.  Sports that return an API error
-    (e.g. unsupported market/region combos) are silently skipped so the scan
-    always completes.
+    Uses a thread pool to fetch multiple sports simultaneously, cutting scan time
+    from O(n_sports × latency) to roughly O(latency).  Sports that error out
+    (unsupported market/region) are silently skipped.
 
-    Result is cached for 2 minutes to balance freshness with API quota usage.
+    Result is cached for 2 minutes.
     """
-    all_arb: list = []
     sports = load_sports()
+    args   = [(sk, market, region, bankroll) for sk in sports.values()]
 
-    for sport_key in sports.values():
-        try:
-            events = get_odds(
-                sport=sport_key,
-                markets=market,
-                regions=region,
-                odds_format="american",
-                include_links=True,
-                include_sids=True,
-            )
-            for event in events:
-                analysis = analyze_event(event, bankroll, selected_market=market)
-                if analysis and analysis["arbitrage"]:
-                    all_arb.append(analysis)
-        except Exception:
-            continue  # skip unsupported sport / market combos
+    all_arb: list = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        for result in as_completed([executor.submit(_fetch_sport_arb, a) for a in args]):
+            all_arb.extend(result.result())
 
     return sorted(all_arb, key=lambda x: x.get("roi") or 0, reverse=True)
+
+
+@st.cache_data(ttl=60)
+def load_ev_bets(sport_key: str, market: str, region: str) -> list:
+    """Fetch odds for one sport and return all +EV bets vs Pinnacle's sharp line.
+
+    Requires Pinnacle to be present in the fetched region (eu or uk).
+    Returns an empty list if no events contain Pinnacle odds.
+    """
+    try:
+        events = get_odds(
+            sport=sport_key, markets=market, regions=region,
+            odds_format="american", include_links=True, include_sids=True,
+        )
+    except Exception:
+        return []
+
+    all_ev: list = []
+    for event in events:
+        all_ev.extend(find_ev_bets(event, selected_market=market))
+    return sorted(all_ev, key=lambda x: x["ev_pct"], reverse=True)
 
 
 # =============================================================================
@@ -617,21 +669,19 @@ def add_direct_links(df: pd.DataFrame, analyses: list) -> pd.DataFrame:
     analysis results. This preserves deep links built in arbitrage.py.
     """
     df = df.copy()
-    df["Direct Link"] = None
 
     # Build a lookup: (event, bookmaker) → link  for O(1) access
-    link_lookup = {}
-    for analysis in analyses:
-        for res in analysis.get("results", []):
-            key = (analysis.get("event"), res.get("bookmaker"))
-            link_lookup[key] = res.get("link")
+    link_lookup = {
+        (analysis.get("event"), res.get("bookmaker")): res.get("link")
+        for analysis in analyses
+        for res in analysis.get("results", [])
+    }
 
-    for idx, row in df.iterrows():
-        game = row.get("event") or row.get("Game")
-        book = row.get("bookmaker")
-        if game and book:
-            df.at[idx, "Direct Link"] = link_lookup.get((game, book))
-
+    game_col = "event" if "event" in df.columns else "Game"
+    df["Direct Link"] = df.apply(
+        lambda row: link_lookup.get((row.get(game_col), row.get("bookmaker"))),
+        axis=1,
+    )
     return df
 
 
@@ -760,6 +810,18 @@ def efficiency_badge(eff: float) -> str:
     else:
         style = f"{base} background:rgba(107,118,148,0.15); color:#6b7694; border:1px solid #2a2f3e;"
         return f'<span style="{style}">&#9671; Normal</span>'
+
+
+def render_page_header(title: str, tag: str, caption: str = "") -> None:
+    """Render the standard page header (h1 + badge tag) plus an optional caption and divider."""
+    st.markdown(
+        f'<div class="header-bar"><h1>{title}</h1>'
+        f'<span class="header-tag">{tag}</span></div>',
+        unsafe_allow_html=True,
+    )
+    if caption:
+        st.caption(caption)
+    st.markdown("---")
 
 
 def build_game_info_link(game_name: str) -> str:
@@ -1028,14 +1090,18 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
         and event_rows["Direct Link"].notna().any()
     )
 
-    # Per-outcome accent colours — cycles if there are more than 4 outcomes
-    outcome_colors = ["#00e5a0", "#3d9bff", "#f5a623", "#ff5b5b"]
+    C = COLORS  # local alias for brevity inside HTML f-strings
 
-    # Reusable inline style fragments
-    th = ("padding:10px 14px;text-align:left;font-size:0.62rem;text-transform:uppercase;"
-          "letter-spacing:0.1em;color:#6b7694;border-bottom:1px solid #2a2f3e;white-space:nowrap;")
-    td  = "padding:11px 14px;font-size:0.82rem;color:#e8ecf3;border-bottom:1px solid #1e222d;white-space:nowrap;"
+    # Per-outcome accent colours — cycles if there are more than 4 outcomes
+    outcome_colors = [C["arb_green"], C["accent2"], C["warning"], C["danger"]]
+
+    # Reusable inline style fragments — all colours pulled from COLORS
+    th = (f"padding:10px 14px;text-align:left;font-size:0.62rem;text-transform:uppercase;"
+          f"letter-spacing:0.1em;color:{C['text_muted']};border-bottom:1px solid {C['border']};white-space:nowrap;")
+    td  = f"padding:11px 14px;font-size:0.82rem;color:{C['text']};border-bottom:1px solid {C['surface2']};white-space:nowrap;"
     tn  = td + "text-align:right;font-family:'IBM Plex Mono',monospace;"
+    # Slightly darker stripe for alternating rows (not in COLORS — intentional subtle variation)
+    _row_bg_alt = "#13161f"
 
     rows_html = ""
     for i, (_, row) in enumerate(event_rows.iterrows()):
@@ -1047,15 +1113,15 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
         link     = row.get("Direct Link", None)
 
         accent = outcome_colors[i % len(outcome_colors)]
-        bg     = "#161922" if i % 2 == 0 else "#13161f"
+        bg     = C["surface"] if i % 2 == 0 else _row_bg_alt
 
         # Positive American odds get a green colour; negative stay default
         try:
             am_int    = int(am_odds)
-            am_color  = "#00e5a0" if am_int > 0 else "#e8ecf3"
+            am_color  = C["arb_green"] if am_int > 0 else C["text"]
             am_prefix = "+" if am_int > 0 else ""
         except (ValueError, TypeError):
-            am_int, am_color, am_prefix = None, "#e8ecf3", ""
+            am_int, am_color, am_prefix = None, C["text"], ""
 
         try:
             dec_str = f"{float(dec_odds):.4f}"
@@ -1071,15 +1137,15 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
         if link and str(link).startswith("http"):
             link_cell = (
                 f'<a href="{link}" target="_blank" style="display:inline-block;padding:3px 10px;'
-                'border-radius:5px;background:rgba(61,155,255,0.1);border:1px solid #3d9bff;'
-                'color:#3d9bff;font-size:0.7rem;text-decoration:none;text-transform:uppercase;">'
+                f'border-radius:5px;background:rgba(61,155,255,0.1);border:1px solid {C["accent2"]};'
+                f'color:{C["accent2"]};font-size:0.7rem;text-decoration:none;text-transform:uppercase;">'
                 'Bet &#8594;</a>'
             )
         else:
-            link_cell = '<span style="color:#6b7694;">&#8212;</span>'
+            link_cell = f'<span style="color:{C["text_muted"]};">&#8212;</span>'
 
-        stake_td = f'<td style="{tn}color:#f5a623;">{stake_str}</td>' if has_stake else ""
-        link_td  = f'<td style="{td}">{link_cell}</td>'               if has_link  else ""
+        stake_td = f'<td style="{tn}color:{C["warning"]};">{stake_str}</td>' if has_stake else ""
+        link_td  = f'<td style="{td}">{link_cell}</td>'                      if has_link  else ""
 
         rows_html += (
             f'<tr style="background:{bg};">'
@@ -1096,9 +1162,9 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
     lh = f'<th style="{th}">Place Bet</th>'                      if has_link  else ""
 
     return (
-        '<div style="border:1px solid #2a2f3e;border-radius:10px;overflow:hidden;width:100%;">'
+        f'<div style="border:1px solid {C["border"]};border-radius:10px;overflow:hidden;width:100%;">'
         '<table style="width:100%;border-collapse:collapse;">'
-        f'<thead><tr style="background:#1e222d;">'
+        f'<thead><tr style="background:{C["surface2"]};">'
         f'<th style="{th}">Outcome</th>'
         f'<th style="{th}">Sportsbook</th>'
         f'<th style="{th}text-align:right;">Amer. Odds</th>'
@@ -1126,7 +1192,7 @@ with st.sidebar:
 
     page = st.radio(
         "Page",
-        ["📊 Market Scanner", "⚡ All Arbitrage"],
+        ["📊 Market Scanner", "⚡ All Arbitrage", "📈 +EV Bets"],
         label_visibility="collapsed",
     )
     st.markdown("---")
@@ -1137,8 +1203,15 @@ with st.sidebar:
     market_display = st.selectbox("Market type", list(MARKET_OPTIONS.keys()))
     market         = MARKET_OPTIONS[market_display]
 
-    region_display = st.selectbox("Sportsbook region", list(REGION_OPTIONS.keys()))
-    region         = REGION_OPTIONS[region_display]
+    region_display = st.multiselect(
+        "Sportsbook region",
+        list(REGION_OPTIONS.keys()),
+        default=["United States"],
+    )
+    if not region_display:
+        st.warning("Select at least one region.")
+        st.stop()
+    region = ",".join(REGION_OPTIONS[r] for r in region_display)
 
     bankroll = st.number_input("Budget per game ($)", min_value=1.0, value=100.0, step=10.0)
 
@@ -1153,12 +1226,50 @@ with st.sidebar:
             help="Lower = better value. Arbitrage < 1.000",
         )
         top_n = st.slider("Games to show", 5, 100, 15, 5)
+        min_roi = st.slider(
+            "Min ROI % (arb only)", 0.0, 5.0, 0.0, 0.1,
+            help="Hide arbitrage opportunities below this return threshold.",
+        )
+        excluded_books = set(st.multiselect(
+            "Exclude sportsbooks",
+            sorted(BOOK_LINKS.keys()),
+            default=[],
+            help="Remove books you don't have accounts at.",
+        ))
     else:
         max_efficiency = DEFAULT_MAX_EFFICIENCY
         top_n          = DEFAULT_TOP_N
+        min_roi        = 0.0
+        excluded_books = set()
 
     st.markdown("---")
-    refresh = st.button("↻ Refresh data", use_container_width=True)
+    col_r1, col_r2 = st.columns([2, 1])
+    with col_r1:
+        refresh = st.button("↻ Refresh", use_container_width=True)
+    with col_r2:
+        auto_refresh = st.toggle("Auto", value=False, help="Reload every 60 seconds")
+
+    quota = get_quota_info()
+    if quota["remaining"] is not None:
+        try:
+            remaining = int(quota["remaining"])
+            used      = int(quota["used"]) if quota["used"] is not None else None
+            total     = (remaining + used) if used is not None else None
+            pct       = int((remaining / total) * 100) if total else None
+            color     = "#00e5a0" if pct is None or pct > 25 else ("#f5a623" if pct > 10 else "#ff5b5b")
+            pct_label = f" ({pct}%)" if pct is not None else ""
+            st.markdown(
+                f'<div style="margin-top:0.6rem;padding:0.6rem 0.8rem;background:#1e222d;'
+                f'border:1px solid #2a2f3e;border-radius:6px;">'
+                f'<span style="font-size:0.62rem;color:#6b7694;text-transform:uppercase;'
+                f'letter-spacing:0.08em;display:block;margin-bottom:3px;">API Quota</span>'
+                f'<span style="font-size:0.88rem;font-weight:700;color:{color};">'
+                f'{remaining:,} left{pct_label}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        except (ValueError, TypeError):
+            pass
 
 # Clear cache on manual refresh so the next run fetches fresh API data
 if refresh:
@@ -1173,17 +1284,11 @@ if refresh:
 
 if page == "⚡ All Arbitrage":
 
-    st.markdown("""
-    <div class="header-bar">
-      <h1>All Arbitrage</h1>
-      <span class="header-tag">Cross-Sport</span>
-    </div>
-    """, unsafe_allow_html=True)
-    st.caption(
+    render_page_header(
+        "All Arbitrage", "Cross-Sport",
         "Every sport scanned simultaneously. Only guaranteed-profit opportunities are shown. "
-        "Cached for 2 minutes — hit Refresh to force a new scan."
+        "Cached for 2 minutes — hit Refresh to force a new scan.",
     )
-    st.markdown("---")
 
     with st.spinner("Scanning all sports for arbitrage…"):
         arb_all = load_all_arbitrage(market, region, bankroll)
@@ -1269,11 +1374,7 @@ if page == "⚡ All Arbitrage":
 
                 badge_html = efficiency_badge(eff)
                 live_html  = (
-                    '<span style="display:inline-flex;align-items:center;gap:6px;'
-                    'font-weight:700;color:#ff5b5b;font-size:0.78rem;letter-spacing:0.1em;'
-                    'text-transform:uppercase;">'
-                    '<span style="width:8px;height:8px;background:#ff5b5b;border-radius:50%;'
-                    'display:inline-block;"></span>LIVE</span>'
+                    '<span class="live-indicator"><span class="live-dot"></span>LIVE</span>'
                     if is_live_now else ""
                 )
 
@@ -1359,12 +1460,142 @@ if page == "⚡ All Arbitrage":
 
 
 # =============================================================================
+# +EV BETS PAGE
+# Compares every bookmaker against Pinnacle's de-vigged line.
+# Requires Pinnacle in the selected region (eu or uk).
+# =============================================================================
+
+if page == "📈 +EV Bets":
+
+    render_page_header(
+        "+EV Bets", "vs Pinnacle",
+        "Bets where a bookmaker's odds exceed Pinnacle's de-vigged implied probability. "
+        "Requires **Europe** or **UK** region to include Pinnacle's sharp line.",
+    )
+
+    has_eu_or_uk = any(r in region for r in ("eu", "uk"))
+    if not has_eu_or_uk:
+        st.warning(
+            "Pinnacle is only available in the **Europe** or **UK** regions. "
+            "Add one of those regions in the sidebar to enable +EV detection."
+        )
+        st.stop()
+
+    with st.spinner("Scanning for +EV opportunities…"):
+        ev_results = load_ev_bets(sport_key, market, region)
+
+    if not ev_results:
+        st.info(
+            "No +EV bets found for this sport / market. "
+            "Pinnacle may not have lines for this market yet, or the market is very efficient."
+        )
+        st.stop()
+
+    # ── KPIs ─────────────────────────────────────────────────────────────────
+    best_ev   = ev_results[0]["ev_pct"]
+    avg_ev    = round(sum(r["ev_pct"] for r in ev_results) / len(ev_results), 2)
+    books_hit = len({r["bookmaker"] for r in ev_results})
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("+EV Bets Found", len(ev_results))
+    k2.metric("Best EV",        f"+{best_ev:.2f}%")
+    k3.metric("Avg EV",         f"+{avg_ev:.2f}%")
+    k4.metric("Books with Edge", books_hit)
+    st.markdown("")
+
+    # ── Min EV filter ────────────────────────────────────────────────────────
+    min_ev_filter = st.slider("Show bets with EV ≥ (%)", 0.0, 5.0, 0.5, 0.1)
+    filtered_ev   = [r for r in ev_results if r["ev_pct"] >= min_ev_filter]
+    st.markdown("")
+
+    if not filtered_ev:
+        st.info(f"No bets above {min_ev_filter:.1f}% EV. Lower the filter to see more.")
+        st.stop()
+
+    # ── Table ────────────────────────────────────────────────────────────────
+    ev_df = pd.DataFrame(filtered_ev).rename(columns={
+        "event":         "Game",
+        "sport":         "Sport",
+        "commence_time": "Start Time",
+        "outcome":       "Bet On",
+        "bookmaker":     "Sportsbook",
+        "american_odds": "American Odds",
+        "decimal_odds":  "Decimal Odds",
+        "true_prob":     "True Prob (%)",
+        "ev_pct":        "EV (%)",
+    })
+    st.subheader(f"+EV Opportunities ({len(filtered_ev)})")
+    st.dataframe(
+        ev_df[["Game", "Bet On", "Sportsbook", "American Odds", "Decimal Odds", "True Prob (%)", "EV (%)"]],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("---")
+    st.subheader("Bet Details")
+
+    for bet in filtered_ev[:20]:   # cap at 20 cards to avoid page overload
+        ev_color = "#00e5a0" if bet["ev_pct"] >= 2 else ("#f5a623" if bet["ev_pct"] >= 1 else "#3d9bff")
+        is_live_ev = is_live_event(str(bet.get("commence_time", "")))
+        live_ev_html = (
+            '<span class="live-indicator"><span class="live-dot"></span>LIVE</span>'
+            if is_live_ev else ""
+        )
+        norm_book = normalize_book_name(bet["bookmaker"])
+        cleaned   = clean_bookmaker_link(bet.get("link"), norm_book)
+        homepage  = BOOK_LINKS.get(norm_book)
+
+        st.markdown(
+            f'<div style="background:#161922;border:1px solid #2a2f3e;border-left:3px solid {ev_color};'
+            f'border-radius:10px;padding:0.9rem 1.1rem;margin-bottom:0.4rem;">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+            f'<div>'
+            f'<span style="font-size:0.6rem;color:#6b7694;text-transform:uppercase;letter-spacing:0.12em;'
+            f'display:block;margin-bottom:3px;">{bet["sport"]} &middot; {format_market_label(market)}</span>'
+            f'<div style="font-family:Syne,sans-serif;font-size:1rem;font-weight:700;color:#e8ecf3;">'
+            f'{bet["event"]}</div>'
+            f'<div style="font-size:0.75rem;color:#6b7694;margin-top:3px;">'
+            f'Bet <b style="color:#e8ecf3;">{bet["outcome"]}</b> '
+            f'@ <b style="color:#e8ecf3;">'
+            f'{"+" if bet["american_odds"] > 0 else ""}{bet["american_odds"]}</b> '
+            f'on <b style="color:#e8ecf3;">{norm_book}</b></div>'
+            f'</div>'
+            f'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'
+            f'{live_ev_html}'
+            f'<span style="font-size:1rem;font-weight:700;color:{ev_color};">+{bet["ev_pct"]:.2f}% EV</span>'
+            f'<span style="font-size:0.72rem;color:#6b7694;">True prob: {bet["true_prob"]:.1f}%</span>'
+            f'</div></div></div>',
+            unsafe_allow_html=True,
+        )
+        if cleaned:
+            st.link_button(f"→ Bet on {norm_book}", cleaned, use_container_width=False)
+        elif homepage:
+            st.link_button(f"{norm_book} (Home)", homepage, use_container_width=False)
+        st.markdown("")
+
+    # ── Download ─────────────────────────────────────────────────────────────
+    st.markdown("---")
+    ev_export = pd.DataFrame(filtered_ev)
+    st.download_button(
+        "↓ Download +EV Bets (CSV)",
+        ev_export.to_csv(index=False).encode("utf-8"),
+        "ev_bets.csv",
+        "text/csv",
+        use_container_width=True,
+    )
+
+    st.stop()   # ← prevent Market Scanner from rendering
+
+
+# =============================================================================
 # Data Pipeline
 # =============================================================================
 
 with st.spinner("Scanning sportsbooks for value…"):
     try:
-        all_analyses, detail_df, event_df = load_data(sport_key, market, region, bankroll)
+        all_analyses, detail_df, event_df = load_data(
+            sport_key, market, region, bankroll, frozenset(excluded_books)
+        )
     except Exception as e:
         st.error(f"Error loading API data: {e}")
         st.stop()
@@ -1377,6 +1608,10 @@ if event_df.empty:
 filtered_event_df = event_df[event_df["Market Efficiency"] <= max_efficiency].copy()
 if show_only_arbitrage:
     filtered_event_df = filtered_event_df[filtered_event_df["Guaranteed Profit"] == "Yes"]
+if min_roi > 0:
+    arb_mask = filtered_event_df["Guaranteed Profit"] == "Yes"
+    roi_mask  = filtered_event_df["Return (%)"].fillna(0) >= min_roi
+    filtered_event_df = filtered_event_df[~arb_mask | (arb_mask & roi_mask)]
 
 matching_games    = filtered_event_df["Game"].tolist()
 filtered_detail_df = detail_df[detail_df["event"].isin(matching_games)].copy()
@@ -1397,15 +1632,10 @@ best_roi        = float(best_roi_row.iloc[0]["Return (%)"]) if not best_roi_row.
 # Header + KPI Row
 # =============================================================================
 
-st.markdown("""
-<div class="header-bar">
-  <h1>BetScan</h1>
-  <span class="header-tag">Live Odds</span>
-</div>
-""", unsafe_allow_html=True)
-st.caption("Real-time arbitrage detection across major sportsbooks. Data refreshes every 60 seconds.")
-
-st.markdown("---")
+render_page_header(
+    "BetScan", "Live Odds",
+    "Real-time arbitrage detection across major sportsbooks. Data refreshes every 60 seconds.",
+)
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Games Scanned",    len(event_df))
@@ -1513,10 +1743,7 @@ if matching_games:
     # ── Game info card ──
     badge_html = efficiency_badge(efficiency_val)
     live_html  = (
-        '<div style="display:inline-flex;align-items:center;gap:7px;font-weight:700;'
-        'color:#ff5b5b;font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase;">'
-        '<span style="width:9px;height:9px;background:#ff5b5b;border-radius:50%;display:inline-block;"></span>'
-        'LIVE</div>'
+        '<span class="live-indicator"><span class="live-dot"></span>LIVE</span>'
         if is_live else ""
     )
     game_card_html = (
@@ -1658,4 +1885,12 @@ with col2:
         "betting_opportunities_detailed.csv",
         "text/csv",
         use_container_width=True,
+    )
+
+# Auto-refresh: inject a JS timer that reloads the parent window after 60 s.
+# Only runs when the toggle is on; has no effect on the Python execution model.
+if auto_refresh:
+    components.html(
+        '<script>setTimeout(function(){window.parent.location.reload();},60000);</script>',
+        height=0,
     )
