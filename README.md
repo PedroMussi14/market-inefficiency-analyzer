@@ -43,5 +43,5 @@ For each event:
 1. Clone the repo:
 
 ```bash
-git clone https://github.com/yourusername/yourrepo.git
+git clone https://github.com/PedroMussi14/market-inefficiency-analyzer.git
 cd yourrepo
