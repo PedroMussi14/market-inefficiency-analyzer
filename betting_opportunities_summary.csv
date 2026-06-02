@@ -1,9 +1,2 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-New York Knicks vs Atlanta Hawks,NBA,2026-04-23T23:10:00Z,1.0299,False,,,Atlanta Hawks,DraftKings,102,2.02
-Cleveland Cavaliers vs Toronto Raptors,NBA,2026-04-24T00:10:00Z,1.0229,False,,,Toronto Raptors,FanDuel,132,2.32
-Denver Nuggets vs Minnesota Timberwolves,NBA,2026-04-24T01:30:00Z,1.0218,False,,,Minnesota Timberwolves,LowVig.ag,119,2.19
-Boston Celtics vs Philadelphia 76ers,NBA,2026-04-24T23:10:00Z,1.026,False,,,Philadelphia 76ers,Bovada,250,3.5
-Los Angeles Lakers vs Houston Rockets,NBA,2026-04-25T00:10:00Z,1.0258,False,,,Los Angeles Lakers,Caesars,320,4.2
-San Antonio Spurs vs Portland Trail Blazers,NBA,2026-04-25T02:40:00Z,1.0273,False,,,Portland Trail Blazers,FanDuel,112,2.12
-Detroit Pistons vs Orlando Magic,NBA,2026-04-25T17:10:00Z,1.0055,False,,,Orlando Magic,LowVig.ag,132,2.32
-Oklahoma City Thunder vs Phoenix Suns,NBA,2026-04-25T19:30:00Z,1.025,False,,,Phoenix Suns,LowVig.ag,364,4.64
+Oklahoma City Thunder vs San Antonio Spurs,NBA,2026-05-29T00:40:00Z,1.0017,False,,,Oklahoma City Thunder,Betfair,142,2.42

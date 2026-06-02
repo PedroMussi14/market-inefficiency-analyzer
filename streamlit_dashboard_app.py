@@ -21,8 +21,13 @@ import streamlit.components.v1 as components
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote_plus
 from datetime import datetime, timezone
-from api_client import get_odds, get_sports, get_quota_info
 from arbitrage import analyze_event, find_ev_bets
+from providers import (
+    PROVIDERS,
+    get_provider,
+    list_configured_providers,
+    list_providers,
+)
 from exporter import (
     analyses_to_dataframe,
     export_detailed_csv,
@@ -87,13 +92,74 @@ MARKET_OPTIONS = {
     "Game Total":               "totals",
 }
 
-# Sportsbook region display name → API key mapping
+# Sportsbook region display name → API key mapping.
+# "Brasil" is a convenience preset that maps to eu+uk — these regions cover
+# the major books that legally accept Brazilian users (Bet365, Betfair,
+# Pinnacle, 1xBet, Betsson, etc.). Native Brazilian books like Betano, KTO,
+# and Pixbet are NOT available via The Odds API — they require a different
+# provider (e.g. OddsPapi.io).
 REGION_OPTIONS = {
-    "United States": "us",
+    "Brasil 🇧🇷":      "eu,uk",
+    "United States":  "us",
     "United Kingdom": "uk",
     "Europe":         "eu",
     "Australia":      "au",
 }
+
+# "I bet from..." presets.  Each value is a set of case-insensitive *substring*
+# patterns matched against bookmaker titles. When an accessibility filter is
+# active, only books whose title contains one of the patterns are kept BEFORE
+# arbitrage detection runs — so every arb found is one you can actually execute
+# from a single location, no VPN-juggling required.
+#
+# Pattern matching (substring) handles API name variants like "Bet365",
+# "Bet365 Brasil", and "bet365 (Spain)" all matching the "bet365" pattern.
+ACCESSIBILITY_PRESETS: dict = {
+    "Anywhere 🌍": None,            # disable the filter
+    "Brasil 🇧🇷": {
+        # International books licensed in BR or accepting BR users
+        "bet365", "betfair", "pinnacle", "1xbet", "betsson",
+        "unibet", "betway", "888", "leovegas", "marathonbet",
+        # BR-native operators (may appear if you add a provider that scrapes them)
+        "sportingbet", "betano", "kto", "pixbet", "stake",
+        "estrelabet", "galera", "esportes da sorte", "superbet",
+    },
+    "USA 🇺🇸": {
+        "draftkings", "fanduel", "betmgm", "caesars", "betrivers",
+        "espn bet", "fanatics", "hard rock", "barstool", "pointsbet",
+        "bovada", "mybookie", "betonline", "betus", "lowvig",
+    },
+    "United Kingdom 🇬🇧": {
+        "bet365", "betfair", "william hill", "ladbrokes", "coral",
+        "betway", "888", "unibet", "paddy power", "skybet",
+        "betvictor", "marathonbet", "leovegas",
+    },
+    "Europe 🇪🇺": {
+        "bet365", "betfair", "pinnacle", "1xbet", "betsson",
+        "unibet", "betway", "888", "marathonbet", "betfair exchange",
+    },
+}
+
+# Kept as an alias for any legacy references.
+BR_FRIENDLY_BOOKS = ACCESSIBILITY_PRESETS["Brasil 🇧🇷"]
+
+# Case-insensitive substring patterns. Any bookmaker whose title CONTAINS
+# one of these strings (case-insensitive) is filtered out of arb detection.
+# Using substring match (not exact) catches every regional variant at once —
+# "1xBet", "1xBet AU", "Unibet", "Unibet (NL)", "Unibet (UK)", etc.
+#
+#   - 1xBet: runs dozens of regional sites with independent pricing. The Odds
+#     API serves the international feed, which routinely differs by 2-5% from
+#     what users see on their local 1xBet site → phantom arbs.
+#   - Unibet: doesn't operate in Brazil. Even when arbs include it, BR users
+#     can't actually take them.
+UNRELIABLE_PATTERNS = {"1xbet", "unibet"}
+
+
+def _is_unreliable_book(title: str) -> bool:
+    """True if the bookmaker title matches a known-unreliable pattern."""
+    t = (title or "").lower()
+    return any(pat in t for pat in UNRELIABLE_PATTERNS)
 
 # Efficiency threshold below which a market is considered "near arbitrage"
 NEAR_ARB_THRESHOLD = 1.015
@@ -178,15 +244,50 @@ section[data-testid="stSidebar"] {{
     border-right: 1px solid var(--border) !important;
     width: 290px !important;
 }}
-/* Remove top spacer so the sidebar starts directly at BetScan and doesn't scroll from hidden chrome. */
+/* ── SIDEBAR TOP-GAP ELIMINATION ─────────────────────────────────────────
+   Streamlit's sidebar chrome (header bar, collapse button, optional nav) is
+   layered across several DOM wrappers that change names between releases.
+   We zero them ALL out so "BetScan" sits flush at the top.
+
+   Each of the test IDs / selectors below has been used by Streamlit at some
+   point between 1.20 and 1.42 — keeping them all in keeps us robust across
+   user installs. */
+
+/* 1. Hide the header bar that contains the collapse button */
+section[data-testid="stSidebar"] [data-testid="stSidebarHeader"],
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"],
+[data-testid="stSidebarCollapsedControl"] {{
+    display: none !important;
+}}
+
+/* 2. Hide the collapse button itself (multiple historical test IDs) */
+section[data-testid="stSidebar"] button[data-testid="stSidebarCollapseButton"],
+section[data-testid="stSidebar"] button[data-testid="baseButton-headerNoPadding"],
+section[data-testid="stSidebar"] button[kind="header"],
+section[data-testid="stSidebar"] > div > div:first-child > button {{
+    display: none !important;
+}}
+
+/* 3. Zero out padding on every wrapper between <section> and the user content */
+section[data-testid="stSidebar"] > div,
+section[data-testid="stSidebar"] > div > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
     padding-top: 0 !important;
+    margin-top: 0 !important;
 }}
 section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
-    padding-top: 0 !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 1rem !important;
+    margin-top: 0 !important;
 }}
-section[data-testid="stSidebar"] button[data-testid="stSidebarCollapseButton"] {{
-    display: none !important;
+
+/* 4. Kill the default top margin on the very first element (the h2 "BetScan").
+   Browsers add ~0.83em margin-top to h2 by default; this zeroes it. */
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div:first-child,
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div:first-child > *:first-child,
+section[data-testid="stSidebar"] h2:first-of-type {{
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }}
 section[data-testid="stSidebar"] * {{
     color: var(--text) !important;
@@ -348,19 +449,23 @@ h2, h3 {{
     border-radius: 0 6px 6px 0 !important;
 }}
 
-/* ── EXPANDER ── */
-.streamlit-expanderHeader {{
+/* ── EXPANDER ── (uses modern data-testid; the old .streamlit-expander* classes
+   were removed in Streamlit 1.18+) */
+[data-testid="stExpander"] {{
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
     border-radius: 8px !important;
+    overflow: hidden;
+}}
+[data-testid="stExpander"] summary {{
     color: var(--text) !important;
     font-size: 0.8rem !important;
 }}
-.streamlit-expanderContent {{
+[data-testid="stExpander"] details {{
     background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-top: none !important;
-    border-radius: 0 0 8px 8px !important;
+}}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] {{
+    background: var(--surface) !important;
 }}
 
 /* ── SPINNER ── */
@@ -507,13 +612,13 @@ hr {{
 # =============================================================================
 
 @st.cache_data(ttl=300)
-def load_sports() -> dict:
-    """Fetch available sports from the API and return a display_name → key mapping.
+def load_sports(provider_name: str) -> dict:
+    """Fetch available sports from the selected provider.
 
-    Futures/outright markets are excluded because they can't be arbitraged per-game.
-    Result is cached for 5 minutes.
+    Returns a display_name → key mapping. Futures/outright markets are excluded
+    because they can't be arbitraged per-game. Cached for 5 minutes per provider.
     """
-    sports = get_sports()
+    sports = get_provider(provider_name).get_sports()
     return {
         sport["title"]: sport["key"]
         for sport in sports
@@ -522,15 +627,45 @@ def load_sports() -> dict:
 
 
 def filter_event_bookmakers(events: list, excluded: set) -> list:
-    """Strip excluded bookmakers from each event before analysis."""
-    if not excluded:
+    """Strip excluded + known-unreliable bookmakers from each event.
+
+    Two layers of filtering, always applied:
+      1. User's exact-name exclusions from the Advanced sidebar (e.g. "Bovada")
+      2. Case-insensitive substring match against UNRELIABLE_PATTERNS, which
+         catches every regional variant (1xBet AU, Unibet (NL), etc.) without
+         needing to enumerate them
+    """
+    def should_keep(book: dict) -> bool:
+        title = book.get("title", book.get("key", ""))
+        if title in excluded:
+            return False
+        if _is_unreliable_book(title):
+            return False
+        return True
+
+    out = []
+    for event in events:
+        e = dict(event)
+        e["bookmakers"] = [b for b in event.get("bookmakers", []) if should_keep(b)]
+        out.append(e)
+    return out
+
+
+def filter_to_accessible_books(events: list, accessible_patterns: frozenset) -> list:
+    """Keep only bookmakers whose title contains any of the substring patterns.
+
+    Critical for arbitrage detection: if you can't access both sides of an arb
+    from one location, the arb is unrealisable. Pre-filtering here means every
+    detected arb spans only books you can actually bet at simultaneously.
+    """
+    if not accessible_patterns:
         return events
     out = []
     for event in events:
         e = dict(event)
         e["bookmakers"] = [
             b for b in event.get("bookmakers", [])
-            if b.get("title", b.get("key", "")) not in excluded
+            if any(p in b.get("title", "").lower() for p in accessible_patterns)
         ]
         out.append(e)
     return out
@@ -538,24 +673,25 @@ def filter_event_bookmakers(events: list, excluded: set) -> list:
 
 @st.cache_data(ttl=60)
 def load_data(
+    provider_name: str,
     sport_key: str,
     market: str,
     region: str,
     bankroll: float,
     excluded_books: frozenset = frozenset(),
+    accessible_books: frozenset = frozenset(),
 ) -> tuple:
-    """Fetch live odds and run arbitrage analysis for every event.
+    """Fetch live odds via the selected provider and run arbitrage analysis.
 
-    Result is cached for 60 seconds to reduce API usage while keeping data fresh.
+    Cached per (provider, sport, market, region, bankroll, excluded_books,
+    accessible_books) combination so different settings cache independently.
 
     Returns:
         (all_analyses, detail_df, event_df)
-        - all_analyses : raw list of analysis dicts from arbitrage.py
-        - detail_df    : per-outcome DataFrame with direct links attached
-        - event_df     : per-event summary DataFrame
     """
+    provider = get_provider(provider_name)
     try:
-        events = get_odds(
+        events = provider.get_odds(
             sport=sport_key,
             markets=market,
             regions=region,
@@ -566,8 +702,13 @@ def load_data(
     except Exception as e:
         raise Exception(f"This sport or market is not supported right now. API details: {e}") from e
 
-    if excluded_books:
-        events = filter_event_bookmakers(events, set(excluded_books))
+    # Order matters: accessibility filter FIRST (whitelist), then exclude filter
+    # (subtractive) so users can hide specific books even within their region.
+    if accessible_books:
+        events = filter_to_accessible_books(events, accessible_books)
+    # Always run the bookmaker filter — even with an empty user-excluded set,
+    # the unreliable-pattern check inside still drops 1xBet / Unibet variants.
+    events = filter_event_bookmakers(events, set(excluded_books))
 
     all_analyses = [
         analysis
@@ -584,12 +725,15 @@ def load_data(
 
 def _fetch_sport_arb(args: tuple) -> list:
     """Fetch and analyse one sport for arbitrage. Used by the parallel all-arb scanner."""
-    sport_key, market, region, bankroll = args
+    provider_name, sport_key, market, region, bankroll, accessible_books = args
     try:
-        events = get_odds(
+        provider = get_provider(provider_name)
+        events = provider.get_odds(
             sport=sport_key, markets=market, regions=region,
             odds_format="american", include_links=True, include_sids=True,
         )
+        if accessible_books:
+            events = filter_to_accessible_books(events, accessible_books)
         return [
             analysis for event in events
             if (analysis := analyze_event(event, bankroll, selected_market=market))
@@ -600,17 +744,14 @@ def _fetch_sport_arb(args: tuple) -> list:
 
 
 @st.cache_data(ttl=120)
-def load_all_arbitrage(market: str, region: str, bankroll: float) -> list:
-    """Scan EVERY available sport in parallel and return arbitrage-positive analyses.
-
-    Uses a thread pool to fetch multiple sports simultaneously, cutting scan time
-    from O(n_sports × latency) to roughly O(latency).  Sports that error out
-    (unsupported market/region) are silently skipped.
-
-    Result is cached for 2 minutes.
-    """
-    sports = load_sports()
-    args   = [(sk, market, region, bankroll) for sk in sports.values()]
+def load_all_arbitrage(
+    provider_name: str, market: str, region: str, bankroll: float,
+    accessible_books: frozenset = frozenset(),
+) -> list:
+    """Scan EVERY available sport in parallel via the selected provider."""
+    sports = load_sports(provider_name)
+    args   = [(provider_name, sk, market, region, bankroll, accessible_books)
+              for sk in sports.values()]
 
     all_arb: list = []
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -621,19 +762,22 @@ def load_all_arbitrage(market: str, region: str, bankroll: float) -> list:
 
 
 @st.cache_data(ttl=60)
-def load_ev_bets(sport_key: str, market: str, region: str) -> list:
-    """Fetch odds for one sport and return all +EV bets vs Pinnacle's sharp line.
-
-    Requires Pinnacle to be present in the fetched region (eu or uk).
-    Returns an empty list if no events contain Pinnacle odds.
-    """
+def load_ev_bets(
+    provider_name: str, sport_key: str, market: str, region: str,
+    accessible_books: frozenset = frozenset(),
+) -> list:
+    """Fetch odds for one sport and return all +EV bets vs Pinnacle's sharp line."""
     try:
-        events = get_odds(
+        provider = get_provider(provider_name)
+        events = provider.get_odds(
             sport=sport_key, markets=market, regions=region,
             odds_format="american", include_links=True, include_sids=True,
         )
     except Exception:
         return []
+
+    if accessible_books:
+        events = filter_to_accessible_books(events, accessible_books)
 
     all_ev: list = []
     for event in events:
@@ -802,13 +946,16 @@ def efficiency_badge(eff: float) -> str:
         "font-size:0.68rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;"
     )
     if eff < 1.0:
-        style = f"{base} background:rgba(0,229,160,0.15); color:#00e5a0; border:1px solid #00e5a0;"
+        style = (f"{base} background:rgba(0,229,160,0.15); "
+                 f"color:{COLORS['arb_green']}; border:1px solid {COLORS['arb_green']};")
         return f'<span style="{style}">&#9889; Arbitrage</span>'
     elif eff < NEAR_ARB_THRESHOLD:
-        style = f"{base} background:rgba(245,166,35,0.12); color:#f5a623; border:1px solid #f5a623;"
+        style = (f"{base} background:rgba(245,166,35,0.12); "
+                 f"color:{COLORS['warning']}; border:1px solid {COLORS['warning']};")
         return f'<span style="{style}">&#9670; Near Arb</span>'
     else:
-        style = f"{base} background:rgba(107,118,148,0.15); color:#6b7694; border:1px solid #2a2f3e;"
+        style = (f"{base} background:rgba(107,118,148,0.15); "
+                 f"color:{COLORS['text_muted']}; border:1px solid {COLORS['border']};")
         return f'<span style="{style}">&#9671; Normal</span>'
 
 
@@ -1075,11 +1222,14 @@ def chart_roi_scatter(event_df: pd.DataFrame):
 # HTML Component Builders
 # =============================================================================
 
-def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
+def build_prices_table(event_rows: pd.DataFrame, bankroll: float,
+                       hide_american: bool = False) -> str:
     """Build a styled HTML table showing the best available price per outcome.
 
-    Columns rendered: Outcome | Sportsbook | American Odds | Decimal Odds
+    Columns rendered: Outcome | Sportsbook | [American Odds] | Decimal Odds
     Optional columns appended when data is present: Suggested Bet | Place Bet (link)
+    `hide_american=True` omits the American Odds column (useful for Brazilian
+    books which only display decimal).
     """
     has_stake = (
         "Suggested Bet ($)" in event_rows.columns
@@ -1146,12 +1296,14 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
 
         stake_td = f'<td style="{tn}color:{C["warning"]};">{stake_str}</td>' if has_stake else ""
         link_td  = f'<td style="{td}">{link_cell}</td>'                      if has_link  else ""
+        am_td    = (f'<td style="{tn}color:{am_color};">{am_prefix}{am_odds}</td>'
+                    if not hide_american else "")
 
         rows_html += (
             f'<tr style="background:{bg};">'
             f'<td style="{td}border-left:3px solid {accent};font-weight:600;color:{accent};">{outcome}</td>'
             f'<td style="{td}">{book}</td>'
-            f'<td style="{tn}color:{am_color};">{am_prefix}{am_odds}</td>'
+            f'{am_td}'
             f'<td style="{tn}">{dec_str}</td>'
             f'{stake_td}{link_td}'
             f'</tr>'
@@ -1160,6 +1312,7 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
     # Optional column headers to match optional data columns above
     sh = f'<th style="{th}text-align:right;">Suggested Bet</th>' if has_stake else ""
     lh = f'<th style="{th}">Place Bet</th>'                      if has_link  else ""
+    am_h = f'<th style="{th}text-align:right;">Amer. Odds</th>'  if not hide_american else ""
 
     return (
         f'<div style="border:1px solid {C["border"]};border-radius:10px;overflow:hidden;width:100%;">'
@@ -1167,7 +1320,7 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
         f'<thead><tr style="background:{C["surface2"]};">'
         f'<th style="{th}">Outcome</th>'
         f'<th style="{th}">Sportsbook</th>'
-        f'<th style="{th}text-align:right;">Amer. Odds</th>'
+        f'{am_h}'
         f'<th style="{th}text-align:right;">Dec. Odds</th>'
         f'{sh}{lh}</tr></thead>'
         f'<tbody>{rows_html}</tbody></table></div>'
@@ -1178,13 +1331,8 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float) -> str:
 # Sidebar — User Controls
 # =============================================================================
 
-available_sports = load_sports()
-
-# Prioritised sport list: common sports first, then everything else alphabetically
-sport_options = (
-    [s for s in PRIORITY_SPORTS if s in available_sports]
-    + [s for s in available_sports  if s not in PRIORITY_SPORTS]
-)
+# Provider gating happens before we can load sports — done inline in the sidebar
+# context below so we can show errors / setup help in the right place.
 
 with st.sidebar:
     st.markdown("## ⚡ BetScan")
@@ -1197,6 +1345,54 @@ with st.sidebar:
     )
     st.markdown("---")
 
+    # ── Provider selector ────────────────────────────────────────────────────
+    configured = list_configured_providers()
+    if not configured:
+        st.error("No API providers configured. Add at least one API key to `.env`.")
+        for p in list_providers():
+            st.markdown(f"- **{p.label}** — {p.setup_help()}")
+        st.stop()
+
+    provider_label_to_name = {p.label: p.name for p in configured}
+    provider_label = st.selectbox(
+        "Data provider",
+        list(provider_label_to_name.keys()),
+        help="Switch between odds APIs. Configure additional providers in .env.",
+    )
+    provider_name = provider_label_to_name[provider_label]
+    provider      = get_provider(provider_name)
+    st.caption(provider.region_hint)
+
+    # Inline expandable hint for unconfigured providers
+    unconfigured = [p for p in list_providers() if not p.is_configured()]
+    if unconfigured:
+        with st.expander(f"➕ Add more providers ({len(unconfigured)} available)"):
+            for p in unconfigured:
+                st.markdown(f"**{p.label}**")
+                st.caption(p.setup_help())
+
+    st.markdown("---")
+
+    # Sports list depends on the selected provider
+    try:
+        available_sports = load_sports(provider_name)
+    except NotImplementedError as e:
+        st.error(f"⚠️ {provider.label} adapter is not finished yet:\n\n{e}")
+        st.stop()
+    except Exception as e:
+        st.error(f"Could not load sports from {provider.label}: {e}")
+        st.stop()
+
+    # Prioritised sport list: common sports first, then everything else
+    sport_options = (
+        [s for s in PRIORITY_SPORTS if s in available_sports]
+        + [s for s in available_sports  if s not in PRIORITY_SPORTS]
+    )
+
+    if not sport_options:
+        st.warning(f"{provider.label} returned no active sports right now.")
+        st.stop()
+
     sport_title = st.selectbox("Sport", sport_options)
     sport_key   = available_sports[sport_title]
 
@@ -1206,12 +1402,38 @@ with st.sidebar:
     region_display = st.multiselect(
         "Sportsbook region",
         list(REGION_OPTIONS.keys()),
-        default=["United States"],
+        default=["Brasil 🇧🇷"],
+        help="Brasil = EU+UK books that accept Brazilian users (Bet365, Betfair, Pinnacle, 1xBet, Betsson).",
     )
     if not region_display:
         st.warning("Select at least one region.")
         st.stop()
-    region = ",".join(REGION_OPTIONS[r] for r in region_display)
+    # Expand any preset (e.g. "Brasil" → "eu,uk") and dedupe so combined
+    # selections like "Brasil + Europe" don't double-bill quota for "eu".
+    _region_keys: list = []
+    for r in region_display:
+        _region_keys.extend(REGION_OPTIONS[r].split(","))
+    region = ",".join(sorted(set(_region_keys)))
+
+    # "I bet from" filter — restricts arbitrage detection to books accessible
+    # from one location so every arb found is actually executable (no need to
+    # juggle accounts/VPNs to complete both sides). Defaults to Brasil to
+    # match the default region selection.
+    accessibility_label = st.selectbox(
+        "I bet from",
+        list(ACCESSIBILITY_PRESETS.keys()),
+        index=1,   # "Brasil 🇧🇷"
+        help=("Restricts arbs to books you can access from this location. "
+              "Without this, you'll see 'arbs' that span US + BR books which "
+              "require a VPN to execute."),
+    )
+    accessible_books = frozenset(ACCESSIBILITY_PRESETS[accessibility_label] or ())
+    if accessible_books:
+        st.caption(f"🔒 Filtering to {len(accessible_books)} {accessibility_label} books.")
+
+    # Brazilian books only display decimal odds — hide the American Odds column
+    # throughout the app when the user is betting from Brasil.
+    hide_american_odds = accessibility_label == "Brasil 🇧🇷"
 
     bankroll = st.number_input("Budget per game ($)", min_value=1.0, value=100.0, step=10.0)
 
@@ -1231,10 +1453,11 @@ with st.sidebar:
             help="Hide arbitrage opportunities below this return threshold.",
         )
         excluded_books = set(st.multiselect(
-            "Exclude sportsbooks",
+            "Exclude sportsbooks (additional)",
             sorted(BOOK_LINKS.keys()),
             default=[],
-            help="Remove books you don't have accounts at.",
+            help="Additional books to exclude beyond the always-on unreliable "
+                 "filter (1xBet/Unibet variants are already removed).",
         ))
     else:
         max_efficiency = DEFAULT_MAX_EFFICIENCY
@@ -1242,26 +1465,43 @@ with st.sidebar:
         min_roi        = 0.0
         excluded_books = set()
 
-    st.markdown("---")
-    col_r1, col_r2 = st.columns([2, 1])
-    with col_r1:
-        refresh = st.button("↻ Refresh", use_container_width=True)
-    with col_r2:
-        auto_refresh = st.toggle("Auto", value=False, help="Reload every 60 seconds")
+    # Permanent notice — the unreliable filter always runs, regardless of view mode.
+    st.caption(
+        f"⚠️ Auto-excluding all variants of: {', '.join(sorted(p.title() for p in UNRELIABLE_PATTERNS))}. "
+        "Edit UNRELIABLE_PATTERNS in code to change."
+    )
 
-    quota = get_quota_info()
+    st.markdown("---")
+    refresh = st.button("↻ Refresh data", use_container_width=True)
+    auto_refresh = st.toggle(
+        "Auto-refresh (60s)", value=False,
+        help="Reload the page every 60 seconds to keep odds fresh.",
+    )
+
+    # Inject the auto-refresh JS here so it fires on every page (the previous
+    # placement at the bottom of the file was unreachable on pages that call
+    # st.stop() early — All Arbitrage and +EV Bets).
+    if auto_refresh:
+        components.html(
+            '<script>setTimeout(function(){window.parent.location.reload();},60000);</script>',
+            height=0,
+        )
+
+    quota = provider.get_quota_info()
     if quota["remaining"] is not None:
         try:
             remaining = int(quota["remaining"])
             used      = int(quota["used"]) if quota["used"] is not None else None
             total     = (remaining + used) if used is not None else None
             pct       = int((remaining / total) * 100) if total else None
-            color     = "#00e5a0" if pct is None or pct > 25 else ("#f5a623" if pct > 10 else "#ff5b5b")
+            color     = COLORS["arb_green"] if pct is None or pct > 25 else (
+                        COLORS["warning"]   if pct > 10            else
+                        COLORS["danger"])
             pct_label = f" ({pct}%)" if pct is not None else ""
             st.markdown(
-                f'<div style="margin-top:0.6rem;padding:0.6rem 0.8rem;background:#1e222d;'
-                f'border:1px solid #2a2f3e;border-radius:6px;">'
-                f'<span style="font-size:0.62rem;color:#6b7694;text-transform:uppercase;'
+                f'<div style="margin-top:0.6rem;padding:0.6rem 0.8rem;background:{COLORS["surface2"]};'
+                f'border:1px solid {COLORS["border"]};border-radius:6px;">'
+                f'<span style="font-size:0.62rem;color:{COLORS["text_muted"]};text-transform:uppercase;'
                 f'letter-spacing:0.08em;display:block;margin-bottom:3px;">API Quota</span>'
                 f'<span style="font-size:0.88rem;font-weight:700;color:{color};">'
                 f'{remaining:,} left{pct_label}</span>'
@@ -1291,7 +1531,7 @@ if page == "⚡ All Arbitrage":
     )
 
     with st.spinner("Scanning all sports for arbitrage…"):
-        arb_all = load_all_arbitrage(market, region, bankroll)
+        arb_all = load_all_arbitrage(provider_name, market, region, bankroll, accessible_books)
 
     if not arb_all:
         st.info(
@@ -1301,8 +1541,10 @@ if page == "⚡ All Arbitrage":
     else:
         # ── KPI strip ────────────────────────────────────────────────────────
         sports_with_arb = sorted({a["sport"] for a in arb_all if a.get("sport")})
-        best_roi_arb    = max(a["roi"] for a in arb_all if a.get("roi"))
-        best_profit_arb = max(a["profit"] for a in arb_all if a.get("profit"))
+        # `default=0` prevents ValueError when all roi/profit values are falsy
+        # (shouldn't happen for arb-positive analyses, but safer than crashing).
+        best_roi_arb    = max((a["roi"]    for a in arb_all if a.get("roi")),    default=0)
+        best_profit_arb = max((a["profit"] for a in arb_all if a.get("profit")), default=0)
 
         ka, kb, kc, kd = st.columns(4)
         ka.metric("Opportunities",   len(arb_all))
@@ -1380,19 +1622,20 @@ if page == "⚡ All Arbitrage":
 
                 # Card header
                 st.markdown(
-                    f'<div style="background:#161922;border:1px solid #2a2f3e;border-left:3px solid #00e5a0;'
+                    f'<div style="background:{COLORS["surface"]};border:1px solid {COLORS["border"]};'
+                    f'border-left:3px solid {COLORS["arb_green"]};'
                     f'border-radius:10px;padding:1rem 1.2rem;margin-bottom:0.4rem;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
                     f'<div>'
-                    f'<span style="font-size:0.6rem;color:#6b7694;text-transform:uppercase;'
+                    f'<span style="font-size:0.6rem;color:{COLORS["text_muted"]};text-transform:uppercase;'
                     f'letter-spacing:0.12em;display:block;margin-bottom:3px;">{sport_name} &middot; {format_market_label(market)}</span>'
-                    f'<div style="font-family:Syne,sans-serif;font-size:1.05rem;font-weight:700;color:#e8ecf3;">{game}</div>'
-                    f'<div style="font-size:0.72rem;color:#6b7694;margin-top:3px;">{commence}</div>'
+                    f'<div style="font-family:Syne,sans-serif;font-size:1.05rem;font-weight:700;color:{COLORS["text"]};">{game}</div>'
+                    f'<div style="font-size:0.72rem;color:{COLORS["text_muted"]};margin-top:3px;">{commence}</div>'
                     f'</div>'
                     f'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">'
                     f'{live_html}{badge_html}'
-                    f'<span style="font-size:0.9rem;font-weight:700;color:#00e5a0;">+{roi_val:.2f}% ROI</span>'
-                    f'<span style="font-size:0.78rem;color:#6b7694;">Profit: ${profit_val:.2f}</span>'
+                    f'<span style="font-size:0.9rem;font-weight:700;color:{COLORS["arb_green"]};">+{roi_val:.2f}% ROI</span>'
+                    f'<span style="font-size:0.78rem;color:{COLORS["text_muted"]};">Profit: ${profit_val:.2f}</span>'
                     f'</div></div></div>',
                     unsafe_allow_html=True,
                 )
@@ -1413,7 +1656,7 @@ if page == "⚡ All Arbitrage":
                             "Direct Link":       r.get("link"),
                         })
                     fake_df = pd.DataFrame(fake_df_rows)
-                    st.markdown(build_prices_table(fake_df, bankroll), unsafe_allow_html=True)
+                    st.markdown(build_prices_table(fake_df, bankroll, hide_american=hide_american_odds), unsafe_allow_html=True)
 
                 with col_right:
                     books_used = list({r["bookmaker"] for r in results})
@@ -1482,7 +1725,7 @@ if page == "📈 +EV Bets":
         st.stop()
 
     with st.spinner("Scanning for +EV opportunities…"):
-        ev_results = load_ev_bets(sport_key, market, region)
+        ev_results = load_ev_bets(provider_name, sport_key, market, region, accessible_books)
 
     if not ev_results:
         st.info(
@@ -1524,9 +1767,14 @@ if page == "📈 +EV Bets":
         "true_prob":     "True Prob (%)",
         "ev_pct":        "EV (%)",
     })
+    # When the user is betting from Brasil, drop the American Odds column —
+    # BR books only quote decimal odds.
+    _ev_cols = ["Game", "Bet On", "Sportsbook", "Decimal Odds", "True Prob (%)", "EV (%)"]
+    if not hide_american_odds:
+        _ev_cols.insert(3, "American Odds")
     st.subheader(f"+EV Opportunities ({len(filtered_ev)})")
     st.dataframe(
-        ev_df[["Game", "Bet On", "Sportsbook", "American Odds", "Decimal Odds", "True Prob (%)", "EV (%)"]],
+        ev_df[_ev_cols],
         use_container_width=True,
         hide_index=True,
     )
@@ -1535,7 +1783,9 @@ if page == "📈 +EV Bets":
     st.subheader("Bet Details")
 
     for bet in filtered_ev[:20]:   # cap at 20 cards to avoid page overload
-        ev_color = "#00e5a0" if bet["ev_pct"] >= 2 else ("#f5a623" if bet["ev_pct"] >= 1 else "#3d9bff")
+        ev_color = (COLORS["arb_green"] if bet["ev_pct"] >= 2 else
+                    COLORS["warning"]   if bet["ev_pct"] >= 1 else
+                    COLORS["accent2"])
         is_live_ev = is_live_event(str(bet.get("commence_time", "")))
         live_ev_html = (
             '<span class="live-indicator"><span class="live-dot"></span>LIVE</span>'
@@ -1545,25 +1795,32 @@ if page == "📈 +EV Bets":
         cleaned   = clean_bookmaker_link(bet.get("link"), norm_book)
         homepage  = BOOK_LINKS.get(norm_book)
 
+        # BR books only display decimal — show decimal-only when betting from Brasil
+        if hide_american_odds:
+            _odds_display = f'{bet["decimal_odds"]:.3f}'
+        else:
+            _am = bet["american_odds"]
+            _odds_display = f'{"+" if _am > 0 else ""}{_am}'
+
         st.markdown(
-            f'<div style="background:#161922;border:1px solid #2a2f3e;border-left:3px solid {ev_color};'
+            f'<div style="background:{COLORS["surface"]};border:1px solid {COLORS["border"]};'
+            f'border-left:3px solid {ev_color};'
             f'border-radius:10px;padding:0.9rem 1.1rem;margin-bottom:0.4rem;">'
             f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
             f'<div>'
-            f'<span style="font-size:0.6rem;color:#6b7694;text-transform:uppercase;letter-spacing:0.12em;'
+            f'<span style="font-size:0.6rem;color:{COLORS["text_muted"]};text-transform:uppercase;letter-spacing:0.12em;'
             f'display:block;margin-bottom:3px;">{bet["sport"]} &middot; {format_market_label(market)}</span>'
-            f'<div style="font-family:Syne,sans-serif;font-size:1rem;font-weight:700;color:#e8ecf3;">'
+            f'<div style="font-family:Syne,sans-serif;font-size:1rem;font-weight:700;color:{COLORS["text"]};">'
             f'{bet["event"]}</div>'
-            f'<div style="font-size:0.75rem;color:#6b7694;margin-top:3px;">'
-            f'Bet <b style="color:#e8ecf3;">{bet["outcome"]}</b> '
-            f'@ <b style="color:#e8ecf3;">'
-            f'{"+" if bet["american_odds"] > 0 else ""}{bet["american_odds"]}</b> '
-            f'on <b style="color:#e8ecf3;">{norm_book}</b></div>'
+            f'<div style="font-size:0.75rem;color:{COLORS["text_muted"]};margin-top:3px;">'
+            f'Bet <b style="color:{COLORS["text"]};">{bet["outcome"]}</b> '
+            f'@ <b style="color:{COLORS["text"]};">{_odds_display}</b> '
+            f'on <b style="color:{COLORS["text"]};">{norm_book}</b></div>'
             f'</div>'
             f'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'
             f'{live_ev_html}'
             f'<span style="font-size:1rem;font-weight:700;color:{ev_color};">+{bet["ev_pct"]:.2f}% EV</span>'
-            f'<span style="font-size:0.72rem;color:#6b7694;">True prob: {bet["true_prob"]:.1f}%</span>'
+            f'<span style="font-size:0.72rem;color:{COLORS["text_muted"]};">True prob: {bet["true_prob"]:.1f}%</span>'
             f'</div></div></div>',
             unsafe_allow_html=True,
         )
@@ -1594,7 +1851,8 @@ if page == "📈 +EV Bets":
 with st.spinner("Scanning sportsbooks for value…"):
     try:
         all_analyses, detail_df, event_df = load_data(
-            sport_key, market, region, bankroll, frozenset(excluded_books)
+            provider_name, sport_key, market, region, bankroll,
+            frozenset(excluded_books), accessible_books,
         )
     except Exception as e:
         st.error(f"Error loading API data: {e}")
@@ -1747,18 +2005,18 @@ if matching_games:
         if is_live else ""
     )
     game_card_html = (
-        '<div style="background:#161922;border:1px solid #2a2f3e;border-radius:10px;'
-        'padding:1rem 1.2rem;margin-bottom:0.75rem;">'
-        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
-        '<div>'
-        '<span style="font-size:0.62rem;color:#6b7694;text-transform:uppercase;'
-        'letter-spacing:0.12em;display:block;margin-bottom:4px;">Selected Game</span>'
-        f'<div style="font-family:Syne,sans-serif;font-size:1.1rem;font-weight:700;color:#e8ecf3;">{selected_game}</div>'
-        f'<div style="font-size:0.75rem;color:#6b7694;margin-top:4px;">{event_summary["Sport"]} &middot; {format_market_label(market)}</div>'
-        '</div>'
+        f'<div style="background:{COLORS["surface"]};border:1px solid {COLORS["border"]};'
+        f'border-radius:10px;padding:1rem 1.2rem;margin-bottom:0.75rem;">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+        f'<div>'
+        f'<span style="font-size:0.62rem;color:{COLORS["text_muted"]};text-transform:uppercase;'
+        f'letter-spacing:0.12em;display:block;margin-bottom:4px;">Selected Game</span>'
+        f'<div style="font-family:Syne,sans-serif;font-size:1.1rem;font-weight:700;color:{COLORS["text"]};">{selected_game}</div>'
+        f'<div style="font-size:0.75rem;color:{COLORS["text_muted"]};margin-top:4px;">{event_summary["Sport"]} &middot; {format_market_label(market)}</div>'
+        f'</div>'
         f'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">{live_html}{badge_html}</div>'
-        '</div>'
-        '</div>'
+        f'</div>'
+        f'</div>'
     )
     st.markdown(game_card_html, unsafe_allow_html=True)
 
@@ -1785,7 +2043,7 @@ if matching_games:
 
     with left:
         st.markdown("##### Best Prices")
-        st.markdown(build_prices_table(event_rows, bankroll), unsafe_allow_html=True)
+        st.markdown(build_prices_table(event_rows, bankroll, hide_american=hide_american_odds), unsafe_allow_html=True)
 
         st.markdown("")
         if pd.notna(roi_val):
@@ -1853,6 +2111,8 @@ with st.expander("🗂 Show all filtered results"):
             "Game", "Sport", "Bet On", "Sportsbook", "American Odds", "Decimal Odds",
             "Suggested Bet ($)", "Profit ($)", "Return (%)", "Guaranteed Profit",
         ]
+        if hide_american_odds:
+            useful_cols = [c for c in useful_cols if c != "American Odds"]
         existing_cols = [c for c in useful_cols if c in display_detail_df.columns]
         st.dataframe(
             display_detail_df[existing_cols].sort_values(
@@ -1887,10 +2147,6 @@ with col2:
         use_container_width=True,
     )
 
-# Auto-refresh: inject a JS timer that reloads the parent window after 60 s.
-# Only runs when the toggle is on; has no effect on the Python execution model.
-if auto_refresh:
-    components.html(
-        '<script>setTimeout(function(){window.parent.location.reload();},60000);</script>',
-        height=0,
-    )
+# Note: auto-refresh JS is injected inside the sidebar block so it fires on
+# every page (the All Arbitrage and +EV Bets pages call st.stop() and never
+# reach the bottom of this file).

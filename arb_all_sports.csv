@@ -1,5 +1,25 @@
 event,sport,commence_time,implied_prob_sum,arbitrage,profit,roi,best_outcome,best_bookmaker,best_american_odds,best_decimal_odds
-UCLA Bruins vs California Golden Bears,NCAAF,2026-09-05T16:00:00Z,0.9662,True,3.5,3.5,UCLA Bruins,Fanatics,140,2.4
-NC State Wolfpack vs Virginia Cavaliers,NCAAF,2026-08-29T16:00:00Z,0.9802,True,2.02,2.02,NC State Wolfpack,DraftKings,130,2.3
-Oklahoma Sooners vs Michigan Wolverines,NCAAF,2026-09-12T16:00:00Z,0.9899,True,1.02,1.02,Oklahoma Sooners,Bovada,125,2.25
-New Zealand vs Iran,FIFA World Cup,2026-06-16T01:00:00Z,0.994,True,0.6,0.6,New Zealand,FanDuel,480,5.8
+Luciano Darderi vs Francisco Comesana,ATP French Open,2026-05-28T13:30:00Z,0.9531,True,4.92,4.92,Francisco Comesana,Betfair Sportsbook,225,3.25
+Madison Keys vs Antonia Ruzic,WTA French Open,2026-05-28T13:30:00Z,0.9676,True,3.35,3.35,Antonia Ruzic,Betfair,5900,60.0
+Ben Shelton vs Raphael Collignon,ATP French Open,2026-05-28T17:50:00Z,0.9792,True,2.13,2.13,Raphael Collignon,Betfair,220,3.2
+Learner Tien vs Flavio Cobolli,ATP French Open,2026-05-30T09:00:00Z,0.9805,True,1.99,1.99,Learner Tien,Betway,165,2.65
+Ecuador vs Ivory Coast,FIFA World Cup,2026-06-14T23:00:00Z,0.987,True,1.31,1.31,Ivory Coast,Betfair,285,3.85
+Birmingham Bears vs Worcestershire,T20 Blast,2026-05-29T16:30:00Z,0.9889,True,1.12,1.12,Birmingham Bears,Unibet (SE),115,2.15
+Anastasia Potapova vs Katie Boulter,WTA French Open,2026-05-28T16:00:00Z,0.9908,True,0.93,0.93,Katie Boulter,Betfair,235,3.35
+Amanda Anisimova vs Diane Parry,WTA French Open,2026-05-30T09:00:00Z,0.992,True,0.81,0.81,Diane Parry,Betfair,340,4.4
+Iga Swiatek vs Magda Linette,WTA French Open,2026-05-29T09:00:00Z,0.9924,True,0.77,0.77,Magda Linette,1xBet,2400,25.0
+Alexander Zverev vs Quentin Halys,ATP French Open,2026-05-29T18:15:00Z,0.9934,True,0.66,0.66,Quentin Halys,888sport,1600,17.0
+Stefanos Tsitsipas vs Matteo Arnaldi,ATP French Open,2026-05-28T18:30:00Z,0.9937,True,0.64,0.64,Matteo Arnaldi,Betfair,184,2.84
+DR Congo vs Colombia,FIFA World Cup,2026-06-24T02:00:00Z,0.9943,True,0.57,0.57,DR Congo,Betfair,780,8.8
+Japan vs Netherlands,FIFA World Cup,2026-06-14T20:00:00Z,0.9944,True,0.57,0.57,Japan,1xBet,296,3.96
+US Catanzaro 1929 vs Monza,Serie B - Italy,2026-05-29T18:00:00Z,0.9948,True,0.52,0.52,US Catanzaro 1929,Unibet (SE),340,4.4
+Brandon Nakashima vs Luca Van Assche,ATP French Open,2026-05-28T15:30:00Z,0.9953,True,0.47,0.47,Brandon Nakashima,Pinnacle,108,2.08
+Uzbekistan vs Portugal,FIFA World Cup,2026-06-23T17:00:00Z,0.9955,True,0.45,0.45,Uzbekistan,Unibet (NL),1600,17.0
+Atlanta Falcons vs Pittsburgh Steelers,NFL,2026-09-13T17:00:00Z,0.9966,True,0.34,0.34,Atlanta Falcons,Pinnacle,145,2.45
+Morocco vs Brazil,FIFA World Cup,2026-06-13T22:00:00Z,0.997,True,0.3,0.3,Morocco,Betsson,520,6.2
+New England Patriots vs Seattle Seahawks,NFL,2026-09-10T00:15:00Z,0.9978,True,0.22,0.22,New England Patriots,Pinnacle,202,3.02
+Sweden vs Netherlands,FIFA World Cup,2026-06-20T17:00:00Z,0.998,True,0.2,0.2,Sweden,Betfair,470,5.7
+Qatar vs Canada,FIFA World Cup,2026-06-18T22:00:00Z,0.9985,True,0.15,0.15,Qatar,Betfair,900,10.0
+Kalmar FF vs GAIS,Allsvenskan - Sweden,2026-05-30T13:00:00Z,0.9986,True,0.14,0.14,Kalmar FF,Unibet (SE),360,4.6
+Croatia vs England,FIFA World Cup,2026-06-17T20:00:00Z,0.9995,True,0.05,0.05,Croatia,Betfair,400,5.0
+Algeria vs Argentina,FIFA World Cup,2026-06-17T01:00:00Z,0.9999,True,0.01,0.01,Algeria,Betfair,840,9.4
