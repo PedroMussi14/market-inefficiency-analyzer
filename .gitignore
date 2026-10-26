@@ -1,0 +1,33 @@
+# --- Secrets -----------------------------------------------------------------
+# Real credentials live only in local .env files. Commit .env.example instead.
+.env
+.env.*
+!.env.example
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# --- Tooling caches ----------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Generated output --------------------------------------------------------
+# CSV exports produced by the CLI and dashboard are run artefacts, not source.
+*.csv
+output/
+
+# --- Editors / OS / local agents ---------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
