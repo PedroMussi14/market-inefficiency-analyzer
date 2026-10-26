@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .arbitrage import analyze_event
 from .export import export_detailed_csv, export_summary_csv
+from .filters import ACCESSIBILITY_PRESETS, prepare_events
 from .providers import PROVIDERS, get_provider, list_configured_providers
 
 DIVIDER = "-" * 90
@@ -32,6 +33,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="market type (default: %(default)s)")
     parser.add_argument("--regions", default="us",
                         help="comma-separated bookmaker regions, e.g. eu,uk (default: %(default)s)")
+    parser.add_argument("--bet-from", default="anywhere", choices=sorted(ACCESSIBILITY_PRESETS),
+                        help="only use books accessible from this location (default: %(default)s)")
+    parser.add_argument("--include-unreliable", action="store_true",
+                        help="keep books with known unreliable feed prices (e.g. 1xBet)")
     parser.add_argument("--bankroll", type=float, default=100.0,
                         help="total stake per event used for stake sizing (default: %(default)s)")
     parser.add_argument("--top", type=int, default=5,
@@ -81,7 +86,11 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 1
 
-    events = provider.get_odds(sport=args.sport, markets=args.market, regions=args.regions)
+    events = prepare_events(
+        provider.get_odds(sport=args.sport, markets=args.market, regions=args.regions),
+        bet_from=args.bet_from,
+        include_unreliable=args.include_unreliable,
+    )
     analyses = [
         analysis
         for event in events
