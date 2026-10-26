@@ -7,7 +7,7 @@ from analyzer.providers.base import Provider
 
 
 def test_registry_contains_expected_providers():
-    assert {"odds_api", "brodds_local", "opticodds"} <= set(providers.PROVIDERS)
+    assert {"odds_api", "demo", "brodds_local", "opticodds"} <= set(providers.PROVIDERS)
     assert all(isinstance(p, Provider) for p in providers.list_providers())
 
 
@@ -46,7 +46,7 @@ class FakeProvider(Provider):
 def test_cli_reports_arbitrage_and_writes_csvs(monkeypatch, tmp_path, capsys, two_way_arb_event):
     monkeypatch.setattr(cli, "get_provider", lambda name: FakeProvider([two_way_arb_event]))
 
-    exit_code = cli.main(["--output-dir", str(tmp_path)])
+    exit_code = cli.main(["--provider", "odds_api", "--output-dir", str(tmp_path)])
 
     out = capsys.readouterr().out
     assert exit_code == 0
@@ -61,3 +61,10 @@ def test_cli_fails_cleanly_without_configuration(monkeypatch, capsys):
 
     assert cli.main(["--provider", "odds_api"]) == 1
     assert "not configured" in capsys.readouterr().err
+
+
+def test_cli_defaults_to_demo_without_api_key(monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("API_KEY", raising=False)
+
+    assert cli.main(["--output-dir", str(tmp_path)]) == 0
+    assert "·  demo  ·" in capsys.readouterr().out

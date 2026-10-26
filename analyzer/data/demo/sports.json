@@ -1,0 +1,34 @@
+[
+  {
+    "key": "basketball_nba",
+    "group": "Basketball",
+    "title": "NBA",
+    "description": "US Basketball",
+    "active": true,
+    "has_outrights": false
+  },
+  {
+    "key": "soccer_epl",
+    "group": "Soccer",
+    "title": "EPL",
+    "description": "English Premier League",
+    "active": true,
+    "has_outrights": false
+  },
+  {
+    "key": "soccer_brazil_campeonato",
+    "group": "Soccer",
+    "title": "Brazil Série A",
+    "description": "Brasileirão Série A",
+    "active": true,
+    "has_outrights": false
+  },
+  {
+    "key": "tennis_atp_paris",
+    "group": "Tennis",
+    "title": "ATP Paris Masters",
+    "description": "Men's Singles",
+    "active": true,
+    "has_outrights": false
+  }
+]

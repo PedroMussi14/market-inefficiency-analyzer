@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .arbitrage import analyze_event
 from .export import export_detailed_csv, export_summary_csv
-from .providers import PROVIDERS, get_provider
+from .providers import PROVIDERS, get_provider, list_configured_providers
 
 DIVIDER = "-" * 90
 
@@ -23,8 +23,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         prog="python -m analyzer",
         description="Scan sportsbook odds for arbitrage opportunities.",
     )
-    parser.add_argument("--provider", default="odds_api", choices=sorted(PROVIDERS),
-                        help="odds data source (default: %(default)s)")
+    parser.add_argument("--provider", default=None, choices=sorted(PROVIDERS),
+                        help="odds data source (default: first configured, "
+                             "'demo' when no API key is set)")
     parser.add_argument("--sport", default="basketball_nba",
                         help="sport key, e.g. soccer_epl (default: %(default)s)")
     parser.add_argument("--market", default="h2h", choices=["h2h", "spreads", "totals"],
@@ -71,10 +72,12 @@ def print_event(analysis: dict) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    provider = get_provider(args.provider)
+    provider = (get_provider(args.provider) if args.provider
+                else list_configured_providers()[0])
 
     if not provider.is_configured():
-        print(f"Provider '{args.provider}' is not configured. {provider.setup_help()}",
+        print(f"Provider '{provider.name}' is not configured. {provider.setup_help()}\n"
+              "Tip: run with --provider demo to use the bundled sample data.",
               file=sys.stderr)
         return 1
 
@@ -90,8 +93,8 @@ def main(argv: list[str] | None = None) -> int:
     export_summary_csv(args.output_dir / "summary.csv", analyses)
 
     print(DIVIDER)
-    print(f"MARKET INEFFICIENCY ANALYZER  ·  {args.sport}  ·  {args.market}  ·  "
-          f"{len(analyses)} events analysed")
+    print(f"MARKET INEFFICIENCY ANALYZER  ·  {provider.name}  ·  {args.sport}  ·  "
+          f"{args.market}  ·  {len(analyses)} events analysed")
     print(DIVIDER)
 
     arbitrage = sorted((a for a in analyses if a["arbitrage"]),

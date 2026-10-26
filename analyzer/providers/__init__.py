@@ -13,14 +13,18 @@ from dotenv import load_dotenv
 
 from .base import Provider
 from .brodds import BroddsLocalProvider
+from .demo import DemoProvider
 from .odds_api import OddsApiProvider
 from .planned import OpticOddsProvider
 
 load_dotenv()
 
-# Order matters: the first configured provider is the dashboard default.
+# Order matters: the first configured provider is the default in the dashboard
+# and CLI. The demo provider is always configured, so without any API key the
+# project still runs end to end on bundled sample data.
 _PROVIDER_INSTANCES: list[Provider] = [
     OddsApiProvider(),
+    DemoProvider(),
     BroddsLocalProvider(),
     OpticOddsProvider(),
 ]
