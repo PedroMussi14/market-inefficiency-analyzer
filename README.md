@@ -73,6 +73,9 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+On Windows, `run.bat` does all of the above in one step: it creates the environment
+on first use, then starts the dashboard.
+
 The dashboard opens at <http://localhost:8501> on the **Demo data** provider:
 24 games across the NBA, Premier League, Brasileirão and ATP tennis, priced by 13
 bookmakers. Try these:
