@@ -5,7 +5,8 @@ other consumer) can swap providers with zero code changes.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel
 
 
 class OutcomeOut(BaseModel):

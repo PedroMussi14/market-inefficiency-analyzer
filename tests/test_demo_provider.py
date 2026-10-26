@@ -1,6 +1,6 @@
 """Tests for the offline demo provider and its bundled sample data."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -43,7 +43,7 @@ def test_events_are_canonical(demo):
 
 
 def test_start_times_are_relative_to_now(demo):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     starts = [datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00"))
               for e in all_events(demo)]
     assert sum(s > now for s in starts) >= len(starts) - 1   # at most one live game

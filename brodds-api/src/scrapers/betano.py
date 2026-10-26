@@ -37,11 +37,10 @@ layout blocks. We walk the full response recursively rather than assuming
 a fixed shape, so the parser is robust to layout changes.
 """
 
-from datetime import datetime, timezone
-from typing import Iterator
+from collections.abc import Iterator
+from datetime import UTC, datetime
 
 from .base import BaseScraper, ScrapedEvent, ScrapedMarket, ScrapedOutcome
-
 
 # Map our canonical sport keys → Betano league URL paths.
 # Add more leagues by inspecting their URL in Betano's DevTools Network tab
@@ -249,9 +248,7 @@ class BetanoScraper(BaseScraper):
         if not isinstance(parts, list) or len(parts) < 2:
             return False
         markets = obj.get("markets")
-        if not isinstance(markets, list) or not markets:
-            return False
-        return True
+        return isinstance(markets, list) and bool(markets)
 
     # -------------------------------------------------------------------------
     # Parse one event
@@ -286,7 +283,7 @@ class BetanoScraper(BaseScraper):
         commence = None
         raw_ms = mres_market.get("marketCloseTimeMillis")
         if isinstance(raw_ms, (int, float)) and raw_ms > 0:
-            commence = datetime.fromtimestamp(raw_ms / 1000, tz=timezone.utc)
+            commence = datetime.fromtimestamp(raw_ms / 1000, tz=UTC)
         if commence is None:
             # Fallback: try a handful of event-level keys in case Kaizen adds one.
             for k in ("eventStartTimeMillis", "startTimeMillis",
@@ -346,10 +343,10 @@ class BetanoScraper(BaseScraper):
             if isinstance(raw, (int, float)):
                 # Unix timestamp — guess ms vs seconds by magnitude
                 ts = raw / 1000 if raw > 1e12 else raw
-                return datetime.fromtimestamp(ts, tz=timezone.utc)
+                return datetime.fromtimestamp(ts, tz=UTC)
             s = str(raw).replace("Z", "+00:00")
             dt = datetime.fromisoformat(s)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
         except (ValueError, TypeError):
             return None
 

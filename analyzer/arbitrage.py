@@ -54,7 +54,7 @@ def calculate_stakes(bankroll: float, odds: list) -> list:
 
 def calculate_profit(bankroll: float, stakes: list, odds: list) -> float:
     """Return the guaranteed profit (worst-case payout minus bankroll)."""
-    payouts = [stake * odd for stake, odd in zip(stakes, odds)]
+    payouts = [stake * odd for stake, odd in zip(stakes, odds, strict=True)]
     return min(payouts) - bankroll
 
 

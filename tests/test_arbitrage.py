@@ -11,7 +11,6 @@ from analyzer.arbitrage import (
 )
 from factories import make_book, make_event, make_outcome
 
-
 # =============================================================================
 # Stake sizing, profit and ROI
 # =============================================================================
@@ -21,7 +20,7 @@ def test_stakes_equalise_payout_across_outcomes():
     stakes = calculate_stakes(100, odds)
 
     assert sum(stakes) == pytest.approx(100)
-    payouts = [s * o for s, o in zip(stakes, odds)]
+    payouts = [s * o for s, o in zip(stakes, odds, strict=True)]
     assert max(payouts) - min(payouts) == pytest.approx(0, abs=1e-9)
 
 

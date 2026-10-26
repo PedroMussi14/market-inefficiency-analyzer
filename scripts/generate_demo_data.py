@@ -185,7 +185,7 @@ def build_market(market: str, event: dict, book: tuple, rng: random.Random,
     if market == "h2h":
         names = [home, "Draw", away] if profile["draw"] else [home, away]
         prices = price_outcomes(event["_probs"], margin, rng)
-        return {"key": "h2h", "outcomes": [{"name": n, "price": p} for n, p in zip(names, prices)]}
+        return {"key": "h2h", "outcomes": [{"name": n, "price": p} for n, p in zip(names, prices, strict=True)]}
 
     step = profile["spread_step"]
     shift = 0.0 if pinned else rng.choice([0, 0, 0, -step, step])

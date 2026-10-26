@@ -1,0 +1,9 @@
+# Test configuration for the BrOdds service. Run from this directory:
+#     pip install -r requirements.txt && pytest
+# Linting is configured in the repository root pyproject.toml.
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"
+asyncio_default_fixture_loop_scope = "function"

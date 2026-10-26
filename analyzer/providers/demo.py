@@ -17,8 +17,8 @@
 # =============================================================================
 
 import json
-from datetime import datetime, timedelta, timezone
-from functools import lru_cache
+from datetime import UTC, datetime, timedelta
+from functools import cache
 from pathlib import Path
 
 from .base import Provider
@@ -30,7 +30,7 @@ def _iso(moment: datetime) -> str:
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load_json(path: Path):
     with path.open(encoding="utf-8") as fh:
         return json.load(fh)
@@ -43,7 +43,7 @@ def build_events(raw_events: list, markets: str, regions: str,
     Bookmakers outside `regions` and markets outside `markets` (both
     comma-separated) are dropped, mirroring how The Odds API behaves.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     wanted_markets = {m.strip() for m in markets.split(",") if m.strip()}
     wanted_regions = {r.strip() for r in regions.split(",") if r.strip()}
 

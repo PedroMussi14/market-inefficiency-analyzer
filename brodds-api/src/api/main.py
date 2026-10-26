@@ -10,7 +10,7 @@ Auth: every request must include `X-API-Key: <BRODDS_API_KEY>` header.
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
 
 import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -20,7 +20,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models, repository, schemas
 from ..config import settings
 from ..database import get_session
-
 
 # =============================================================================
 # Logging setup — structured JSON logs in production, plain in dev
@@ -183,7 +182,8 @@ async def on_startup() -> None:
     # NOTE: there is NO src/api/database.py — the engine lives at src/database.py.
     # The previous `from .database import engine` line was a typo that crashed
     # the API on startup with ModuleNotFoundError. Fixed: use the parent package.
-    from ..database import Base, engine as db_engine
+    from ..database import Base
+    from ..database import engine as db_engine
     async with db_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     log.info("api_started", db=settings.database_url.split("@")[-1])

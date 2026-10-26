@@ -1,5 +1,65 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market-inefficiency-analyzer"
+version = "1.0.0"
+description = "Detects arbitrage and +EV betting opportunities by comparing odds across sportsbooks."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Pedro Mussi" }]
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2,<4",
+    "plotly>=5.20,<8",
+    "python-dotenv>=1.0,<2",
+    "requests>=2.31,<3",
+    "streamlit>=1.50,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.scripts]
+market-analyzer = "analyzer.cli:main"
+
+[project.urls]
+Repository = "https://github.com/PedroMussi14/market-inefficiency-analyzer"
+
+[tool.setuptools.packages.find]
+include = ["analyzer*", "dashboard*"]
+
+[tool.setuptools.package-data]
+analyzer = ["data/demo/*.json", "data/demo/odds/*.json"]
+
+# --- Testing -----------------------------------------------------------------
+# The BrOdds service has its own test configuration in brodds-api/pyproject.toml.
 [tool.pytest.ini_options]
-# The analyzer modules live at the repo root; the BrOdds service is imported as `src.*`.
-pythonpath = [".", "brodds-api"]
-testpaths = ["tests", "brodds-api/tests"]
+pythonpath = ["."]
+testpaths = ["tests"]
 addopts = "-ra"
+
+# --- Linting (applies to the whole repository, including brodds-api) --------
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # import sorting
+    "B",        # bugbear: likely bugs
+    "UP",       # modern Python syntax
+    "SIM",      # simplifications
+]
+# Nested conditional expressions read worse than a short if/else block.
+ignore = ["SIM108"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["analyzer", "dashboard", "src", "factories"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection defaults are evaluated per request, not once.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query"]

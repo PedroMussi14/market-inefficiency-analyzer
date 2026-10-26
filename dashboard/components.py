@@ -5,7 +5,7 @@
 # HTML-escaped before it is placed inside unsafe_allow_html markup.
 # =============================================================================
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html import escape
 from urllib.parse import quote_plus
 
@@ -22,7 +22,7 @@ def is_live_event(commence_time_str: str) -> bool:
         return False
     try:
         event_time = datetime.fromisoformat(commence_time_str.replace("Z", "+00:00"))
-        return event_time <= datetime.now(timezone.utc)
+        return event_time <= datetime.now(UTC)
     except ValueError:
         return False
 
@@ -226,7 +226,8 @@ def build_prices_table(event_rows: pd.DataFrame, bankroll: float,
     # Reusable inline style fragments — all colours pulled from COLORS
     th = (f"padding:10px 14px;text-align:left;font-size:0.62rem;text-transform:uppercase;"
           f"letter-spacing:0.1em;color:{C['text_muted']};border-bottom:1px solid {C['border']};white-space:nowrap;")
-    td  = f"padding:11px 14px;font-size:0.82rem;color:{C['text']};border-bottom:1px solid {C['surface2']};white-space:nowrap;"
+    td  = (f"padding:11px 14px;font-size:0.82rem;color:{C['text']};"
+           f"border-bottom:1px solid {C['surface2']};white-space:nowrap;")
     tn  = td + "text-align:right;font-family:'IBM Plex Mono',monospace;"
     # Slightly darker stripe for alternating rows (not in COLORS — intentional subtle variation)
     _row_bg_alt = "#13161f"

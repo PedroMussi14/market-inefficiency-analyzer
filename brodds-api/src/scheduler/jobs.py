@@ -30,7 +30,6 @@ from ..repository import persist_scraped_events
 from ..scrapers import SCRAPERS
 from ..scrapers.base import BaseScraper
 
-
 logging.basicConfig(level=settings.log_level)
 structlog.configure(
     processors=[

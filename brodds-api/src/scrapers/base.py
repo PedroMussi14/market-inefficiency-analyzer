@@ -26,7 +26,6 @@ import structlog
 
 from ..config import settings
 
-
 # =============================================================================
 # Canonical scrape output — the bridge between scrapers and the DB layer
 # =============================================================================

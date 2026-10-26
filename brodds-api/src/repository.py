@@ -3,7 +3,7 @@
 Keeps SQL out of the scraper, scheduler, and API layers.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import models, normalizer
 from .scrapers.base import ScrapedEvent
-
 
 # =============================================================================
 # Reference data (sports, bookmakers)
@@ -99,7 +98,7 @@ async def _persist_one_event(session: AsyncSession, book: models.Bookmaker,
         session.add(event)
         await session.flush()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Upsert outcomes + write history snapshot
     for market in scraped.markets:
@@ -166,7 +165,7 @@ async def list_events_with_odds(session: AsyncSession, sport_key: str) -> list[m
         select(models.Event)
         .join(models.Sport)
         .where(models.Sport.key == sport_key)
-        .where(models.Event.commence_time >= datetime.now(timezone.utc))
+        .where(models.Event.commence_time >= datetime.now(UTC))
         .options(
             selectinload(models.Event.sport),
             selectinload(models.Event.outcomes).selectinload(models.Outcome.bookmaker),
