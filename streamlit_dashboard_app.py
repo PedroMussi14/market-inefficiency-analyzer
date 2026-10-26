@@ -21,14 +21,15 @@ import streamlit.components.v1 as components
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote_plus
 from datetime import datetime, timezone
-from arbitrage import analyze_event, find_ev_bets
-from providers import (
+from analyzer.arbitrage import analyze_event
+from analyzer.ev import find_ev_bets
+from analyzer.providers import (
     PROVIDERS,
     get_provider,
     list_configured_providers,
     list_providers,
 )
-from exporter import (
+from analyzer.export import (
     analyses_to_dataframe,
     export_detailed_csv,
     export_summary_csv,
@@ -840,6 +841,7 @@ def format_event_detail(df: pd.DataFrame) -> pd.DataFrame:
         "profit":           "Profit ($)",
         "roi":              "Return (%)",
         "outcome":          "Bet On",
+        "point":            "Line",
         "bookmaker":        "Sportsbook",
         "american_odds":    "American Odds",
         "decimal_odds":     "Decimal Odds",
@@ -1962,6 +1964,7 @@ with st.expander("📋 Summary View — all filtered games"):
         "event":            "Game",
         "sport":            "Sport",
         "commence_time":    "Start Time",
+        "line":             "Line",
         "implied_prob_sum": "Market Efficiency",
         "arbitrage":        "Guaranteed Profit",
         "profit":           "Profit ($)",

@@ -61,11 +61,14 @@ async def persist_scraped_events(session: AsyncSession, scraper_title: str,
     persisted = 0
     for ev in events:
         try:
-            await _persist_one_event(session, book, ev)
+            # A SAVEPOINT per event: a failure rolls back only this event.
+            # A plain session.rollback() here would discard every earlier event
+            # in the batch and expire `book`, breaking the rest of the loop.
+            async with session.begin_nested():
+                await _persist_one_event(session, book, ev)
             persisted += 1
         except Exception:
             # Swallow per-event errors so one bad row doesn't kill the batch
-            await session.rollback()
             continue
 
     await session.commit()

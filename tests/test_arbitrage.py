@@ -2,33 +2,19 @@
 
 import pytest
 
-from arbitrage import (
-    american_to_decimal,
+from analyzer.arbitrage import (
     analyze_event,
     build_deep_link,
     calculate_profit,
+    calculate_roi,
     calculate_stakes,
-    implied_probability_sum,
 )
 from factories import make_book, make_event, make_outcome
 
 
 # =============================================================================
-# Odds conversion and core maths
+# Stake sizing, profit and ROI
 # =============================================================================
-
-@pytest.mark.parametrize(
-    ("american", "decimal"),
-    [(150, 2.5), (100, 2.0), (-200, 1.5), (-110, 1 + 100 / 110)],
-)
-def test_american_to_decimal(american, decimal):
-    assert american_to_decimal(american) == pytest.approx(decimal)
-
-
-def test_implied_probability_sum():
-    assert implied_probability_sum([2.0, 2.0]) == pytest.approx(1.0)
-    assert implied_probability_sum([2.1, 2.1]) == pytest.approx(0.952381, rel=1e-6)
-
 
 def test_stakes_equalise_payout_across_outcomes():
     odds = [2.5, 1.9, 4.0]
@@ -42,6 +28,10 @@ def test_stakes_equalise_payout_across_outcomes():
 def test_profit_is_worst_case_payout_minus_bankroll():
     odds = [2.1, 2.1]
     assert calculate_profit(100, calculate_stakes(100, odds), odds) == pytest.approx(5.0)
+
+
+def test_roi_is_profit_as_percentage_of_bankroll():
+    assert calculate_roi(250, 5) == pytest.approx(2.0)
 
 
 # =============================================================================
