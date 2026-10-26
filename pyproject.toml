@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+# The analyzer modules live at the repo root; the BrOdds service is imported as `src.*`.
+pythonpath = [".", "brodds-api"]
+testpaths = ["tests", "brodds-api/tests"]
+addopts = "-ra"

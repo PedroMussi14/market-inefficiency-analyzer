@@ -319,8 +319,10 @@ class BetanoScraper(BaseScraper):
             ))
 
         # Sanity check: a valid soccer market has 3 outcomes (1/X/2);
-        # tennis/MMA has 2. Anything less than 2 means we mis-parsed.
-        if len(h2h_outcomes) < 2:
+        # tennis/MMA has 2. A soccer market missing the Draw would look like a
+        # cheap 2-way market downstream and produce false arbitrage, so reject it.
+        min_outcomes = 3 if sport_key.startswith("soccer") else 2
+        if len(h2h_outcomes) < min_outcomes:
             return None
 
         return ScrapedEvent(

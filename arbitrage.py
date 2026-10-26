@@ -5,8 +5,9 @@
 # Workflow:
 #   1. Extract best odds per outcome from all bookmakers for a given event
 #   2. Convert American odds → Decimal
-#   3. Compute implied probability sum across outcomes
-#   4. If sum < 1.0 → arbitrage exists; calculate optimal stakes, profit, ROI
+#   3. Group outcomes into complete lines (spreads/totals pair on the same line)
+#   4. Compute implied probability sum per line; keep the lowest
+#   5. If sum < 1.0 → arbitrage exists; calculate optimal stakes, profit, ROI
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -295,6 +296,61 @@ def find_ev_bets(event: dict, selected_market: str = "h2h") -> list:
     return sorted(ev_bets, key=lambda x: x["ev_pct"], reverse=True)
 
 
+# =============================================================================
+# Market Completeness & Line Grouping
+# =============================================================================
+
+def _expected_outcome_count(event: dict, selected_market: str) -> int:
+    """Return how many outcomes a complete market must cover.
+
+    Line-based markets are always two-sided (home/away or over/under).
+    For h2h, the largest outcome set any single bookmaker lists is the truth:
+    if one book prices a Draw, a Home+Away pair alone is not a complete hedge.
+    Soccer moneylines are always 3-way, even if every remaining book omits the
+    Draw (e.g. after bookmaker filtering).
+    """
+    if selected_market in LINE_BASED_MARKETS:
+        return 2
+
+    per_book = [
+        len(market.get("outcomes", []))
+        for bookmaker in event.get("bookmakers", [])
+        for market in bookmaker.get("markets", [])
+        if market.get("key") == selected_market
+    ]
+    expected = max(per_book, default=0)
+
+    if str(event.get("sport_key", "")).startswith("soccer"):
+        expected = max(expected, 3)
+    return expected
+
+
+def _group_into_lines(best_odds: dict, selected_market: str, home_team: str) -> dict:
+    """Split best-price outcomes into independent markets ("lines").
+
+    A spread or total is only a hedge when both sides are on the SAME line:
+        spreads → Home -3.5 pairs with Away +3.5  (keyed by the home-team point)
+        totals  → Over 220.5 pairs with Under 220.5 (keyed by the total)
+    h2h has a single line, keyed None.
+
+    Returns {line_key: [outcome_id, ...]}.
+    """
+    if selected_market not in LINE_BASED_MARKETS:
+        return {None: list(best_odds)}
+
+    lines: dict = {}
+    for oid, entry in best_odds.items():
+        point = entry["point"]
+        if point is None:
+            continue
+        if selected_market == "spreads":
+            key = point if entry["name"] == home_team else -point
+        else:
+            key = point
+        lines.setdefault(key, []).append(oid)
+    return lines
+
+
 def analyze_event(
     event: dict,
     bankroll: float = 100,
@@ -302,22 +358,33 @@ def analyze_event(
 ):
     """Analyse a single event for arbitrage opportunities.
 
-    Returns a structured analysis dict, or None if the event has fewer than
-    two priceable outcomes (not enough data to evaluate).
+    Each complete line (see `_group_into_lines`) is evaluated independently and
+    the one with the lowest implied probability sum is reported.
+
+    Returns a structured analysis dict, or None when no line covers every
+    outcome (an incomplete market can never be a guaranteed hedge).
 
     Return schema:
-        event, sport, commence_time, implied_prob_sum, arbitrage,
-        results (list), profit (float | None), roi (float | None)
+        event, sport, commence_time, line (float | None), implied_prob_sum,
+        arbitrage, results (list), profit (float | None), roi (float | None)
     """
     best_odds = get_best_odds_for_event(event, selected_market=selected_market)
+    expected  = max(_expected_outcome_count(event, selected_market), 2)
 
-    if len(best_odds) < 2:
+    candidates = []
+    for line, outcome_ids in _group_into_lines(
+        best_odds, selected_market, event.get("home_team")
+    ).items():
+        if len(outcome_ids) < expected:
+            continue
+        decimal_odds = [best_odds[oid]["odds"] for oid in outcome_ids]
+        candidates.append((implied_probability_sum(decimal_odds), line, outcome_ids, decimal_odds))
+
+    if not candidates:
         return None
 
-    outcome_ids  = list(best_odds.keys())
-    decimal_odds = [best_odds[oid]["odds"] for oid in outcome_ids]
-    prob_sum     = implied_probability_sum(decimal_odds)
-    arb_exists   = prob_sum < 1
+    prob_sum, line, outcome_ids, decimal_odds = min(candidates, key=lambda c: c[0])
+    arb_exists = prob_sum < 1
 
     results = _build_results(best_odds, outcome_ids)
 
@@ -325,6 +392,7 @@ def analyze_event(
         "event":            f"{event.get('away_team')} vs {event.get('home_team')}",
         "sport":            event.get("sport_title"),
         "commence_time":    event.get("commence_time"),
+        "line":             line,
         "implied_prob_sum": prob_sum,
         "arbitrage":        arb_exists,
         "results":          results,

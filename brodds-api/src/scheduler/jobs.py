@@ -81,9 +81,14 @@ async def _ensure_schema() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def main() -> None:
-    await _ensure_schema()
+def build_scheduler() -> AsyncIOScheduler:
+    """Create the scheduler with the periodic scrape job registered.
 
+    `next_run_time` is deliberately NOT passed: in APScheduler 3.x an explicit
+    `next_run_time=None` adds the job *paused*, so it would never fire after
+    the initial cycle. The interval trigger's default first run is one
+    interval from now, which is what we want — main() runs a cycle on boot.
+    """
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         run_all_scrapers,
@@ -91,8 +96,14 @@ async def main() -> None:
         seconds=settings.scrape_interval_seconds,
         max_instances=1,                # never overlap cycles
         coalesce=True,                  # drop missed runs instead of stacking them
-        next_run_time=None,             # don't fire immediately — wait one interval
     )
+    return scheduler
+
+
+async def main() -> None:
+    await _ensure_schema()
+
+    scheduler = build_scheduler()
     scheduler.start()
     log.info("scheduler_started", interval_seconds=settings.scrape_interval_seconds)
 
