@@ -60,7 +60,7 @@ def chart_efficiency_ranking(event_df: pd.DataFrame, top_n: int = 20) -> go.Figu
                 df["Market Efficiency"].max() + 0.008,
             ],
         ),
-        yaxis=dict(showgrid=False, tickfont_size=10),
+        yaxis=dict(showgrid=False, tickfont_size=10, automargin=True),
         height=max(300, len(df) * 34),
         bargap=0.35,
     )

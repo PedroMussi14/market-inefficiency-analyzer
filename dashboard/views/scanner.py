@@ -228,7 +228,7 @@ def render(s: Settings) -> None:
 
     # ── Header + KPIs ────────────────────────────────────────────────────────
     render_page_header(
-        APP_NAME, "Live Odds",
+        APP_NAME, "Demo Data" if s.provider_name == "demo" else "Live Odds",
         "Arbitrage detection across sportsbooks: the best price for every outcome, "
         "and whether together they guarantee a profit. Data is cached for 60 seconds.",
     )

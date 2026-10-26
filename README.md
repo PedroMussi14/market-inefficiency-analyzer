@@ -48,6 +48,17 @@ real but cannot actually be executed.
 - **Tested:** 76 automated tests, including end-to-end tests that drive the real
   dashboard, run on Python 3.11–3.13 in CI.
 
+<details>
+<summary><b>More screenshots</b></summary>
+
+**All Arbitrage:** every sport scanned at once, with stakes per bookmaker
+![All arbitrage view](docs/images/all-arbitrage.png)
+
+**Game breakdown:** odds comparison, stake split and market efficiency gauge
+![Game breakdown](docs/images/game-breakdown.png)
+
+</details>
+
 ## Quick start (60 seconds, no API key needed)
 
 ```bash
