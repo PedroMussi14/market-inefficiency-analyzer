@@ -39,7 +39,7 @@ real but cannot actually be executed.
 - **Execution filters:** "I bet from…" limits analysis to books available in one
   country (Brazil, USA, UK, Europe). Feeds with known-unreliable prices are
   excluded automatically.
-- **Interactive dashboard** (Streamlit + Plotly) with three views: single-sport
+- **Interactive dashboard** (Streamlit) with three views: single-sport
   scanner, all-sports arbitrage sweep and +EV bets, plus CSV export.
 - **Command-line scanner** for scripting and quick checks.
 - **Pluggable data providers:** The Odds API, a self-hosted scraper service for

@@ -26,14 +26,20 @@ from .data import load_sports
 
 PAGES = ["Market scanner", "All arbitrage", "+EV bets"]
 
-# The product's mark: the break-even line, with one price dipping under it
+# Page icons (Material Symbols) shown beside each nav label
+PAGE_ICONS = {
+    "Market scanner": ":material/radar:",
+    "All arbitrage":  ":material/bolt:",
+    "+EV bets":       ":material/trending_up:",
+}
+
+# The product's mark: the break-even line, with one price rising above it
 BRAND_MARK = (
-    '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">'
-    '<rect x="2" y="3" width="4" height="7" fill="#8a8c92"/>'
-    '<rect x="9" y="5" width="4" height="5" fill="#8a8c92"/>'
-    '<rect x="16" y="12" width="4" height="8" fill="#4a8ad6"/>'
-    '<rect x="0" y="10.5" width="22" height="1" fill="#ffffff"/>'
-    '</svg>'
+    '<span class="brand-mark"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">'
+    '<rect x="2" y="11" width="4" height="6" rx="1.5" fill="#a9c5f1"/>'
+    '<rect x="8" y="8" width="4" height="9" rx="1.5" fill="#d3e2f8"/>'
+    '<rect x="14" y="3" width="4" height="14" rx="1.5" fill="#ffffff"/>'
+    '</svg></span>'
 )
 
 
@@ -147,7 +153,7 @@ def _render_quota(provider: Provider) -> None:
     share = remaining / total
     st.markdown(
         '<div class="usage">'
-        f'<div class="row"><span>API credits left</span><span><b>{remaining:,}</b> of {total:,}</span></div>'
+        f'<div class="row-u"><span>API credits left</span><span><b>{remaining:,}</b> of {total:,}</span></div>'
         f'<div class="track"><div class="fill{" low" if share < 0.1 else ""}" '
         f'style="width:{share * 100:.1f}%"></div></div></div>',
         unsafe_allow_html=True,
@@ -159,11 +165,12 @@ def render_sidebar() -> Settings:
     with st.sidebar:
         st.markdown(
             f'<div class="brand">{BRAND_MARK}<div><div class="brand-name">{APP_NAME}</div>'
-            '<div class="brand-scope">Arbitrage and +EV scanner</div></div></div>',
+            '<div class="brand-scope">Sports odds scanner</div></div></div>',
             unsafe_allow_html=True,
         )
 
-        page = st.radio("Page", PAGES, label_visibility="collapsed", key="nav")
+        page = st.radio("Page", PAGES, label_visibility="collapsed", key="nav",
+                        format_func=lambda p: f"{PAGE_ICONS[p]} {p}")
 
         _group("Market")
         provider = _select_provider()

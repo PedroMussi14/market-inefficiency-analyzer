@@ -127,7 +127,7 @@ dashboard/
 ├── data.py          @st.cache_data loaders (fetch → filter → analyse)
 ├── views/           scanner.py · all_arbitrage.py · ev_bets.py, each exposes render(settings)
 ├── components.py    cards, badges, prices table, bookmaker links (escapes provider text)
-├── charts.py        Plotly figures
+├── charts.py        market strip chart (inline SVG)
 ├── theme.py         colour tokens + CSS, shared by charts and HTML
 └── config.py        options and thresholds
 ```

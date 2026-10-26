@@ -17,10 +17,6 @@ def widget(collection, label):
     return next(w for w in collection if w.label == label)
 
 
-def metrics(at) -> dict:
-    return {m.label: m.value for m in at.metric}
-
-
 def page_text(at) -> str:
     return " ".join(str(m.value) for m in at.markdown)
 
@@ -35,9 +31,9 @@ def test_market_scanner_renders_demo_data(app):
 
     assert not at.exception
     assert widget(at.sidebar.selectbox, "Data provider").value.startswith("Demo data")
-    kpis = metrics(at)
-    assert kpis["Games scanned"] == "8"
-    assert int(kpis["Guaranteed profits"]) >= 1
+    games = at.radio(key="watch")
+    assert len(games.options) == 8
+    assert "Guaranteed profit on" in page_text(at)   # the demo NBA slate has an arbitrage
 
 
 @pytest.mark.parametrize("market", ["Point Spread", "Game Total"])
@@ -46,7 +42,7 @@ def test_line_markets_render(app, market):
     widget(at.sidebar.selectbox, "Market type").set_value(market).run()
 
     assert not at.exception
-    assert metrics(at)["Games scanned"] == "8"
+    assert len(at.radio(key="watch").options) == 8
 
 
 def test_all_arbitrage_hides_unreliable_books(app):
@@ -54,7 +50,7 @@ def test_all_arbitrage_hides_unreliable_books(app):
 
     assert not at.exception
     # Default filter (I bet from: Brasil) → the three Brazil-accessible planted arbs
-    assert metrics(at)["Opportunities"] == "3"
+    assert "3 guaranteed-profit opportunities" in page_text(at)
     assert "1xBet" not in page_text(at)
 
 
@@ -64,12 +60,13 @@ def test_all_arbitrage_anywhere_includes_us_books(app):
     widget(at.sidebar.selectbox, "I bet from").set_value("Anywhere").run()
 
     assert not at.exception
-    assert metrics(at)["Opportunities"] == "4"   # + the US-only DraftKings/FanDuel arb
+    # + the US-only DraftKings/FanDuel arb
+    assert "4 guaranteed-profit opportunities" in page_text(at)
 
 
 def test_ev_bets_page_renders(app):
     at = go_to(app.run(), "+EV bets")
 
     assert not at.exception
-    assert int(metrics(at)["+EV bets found"]) >= 1
+    assert "bets beat Pinnacle" in page_text(at)
     assert "1xBet" not in page_text(at)

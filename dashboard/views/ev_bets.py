@@ -10,116 +10,104 @@ import pandas as pd
 import streamlit as st
 
 from ..components import (
+    book_tile,
     book_url,
+    card_head,
     empty_state,
+    facts_html,
+    format_market_label,
     format_outcome,
     format_start,
     normalize_book_name,
     percent,
     render_page_header,
-    section,
-    source_stamp,
+    row_html,
 )
 from ..data import load_ev_bets
 from ..sidebar import Settings
 
+MIN_EV_OPTIONS = [0.0, 0.5, 1.0, 2.0]
 
-def _table(bets: list, s: Settings) -> pd.DataFrame:
-    rows = []
-    for b in bets:
-        book = normalize_book_name(b["bookmaker"])
-        row = {
-            "Game":       b["event"],
-            "Start":      format_start(b.get("commence_time")),
-            "Bet on":     format_outcome(b["outcome"], b.get("point")),
-            "Sportsbook": book,
-        }
-        if not s.hide_american_odds:
-            row["American"] = f'{"+" if b["american_odds"] > 0 else ""}{b["american_odds"]}'
-        row.update({
-            "Decimal":    b["decimal_odds"],
-            "Fair prob.": b["true_prob"],
-            "EV":         b["ev_pct"],
-            "Place bet":  book_url(b["bookmaker"], b.get("link")),
-        })
-        rows.append(row)
-    return pd.DataFrame(rows)
+
+def _row(b: dict) -> str:
+    book = normalize_book_name(b["bookmaker"])
+    outcome = format_outcome(b["outcome"], b.get("point"))
+    return row_html(
+        book_tile(book),
+        f'{outcome} at {b["decimal_odds"]:.2f}',
+        f'{b["event"]} · {book} · {format_start(b.get("commence_time"))}',
+        f'<div class="row-value pos">{percent(b["ev_pct"])}</div>',
+        f'fair chance {b["true_prob"]:.1f}%',
+        book_url(b["bookmaker"], b.get("link")),
+    )
 
 
 def render(s: Settings) -> None:
-    stamp = source_stamp(s.provider_name, 60)
+    scope = format_market_label(s.market)
 
     if not any(r in s.region for r in ("eu", "uk")):
-        render_page_header(
-            "+EV bets",
-            "Pinnacle, the sharp line these bets are measured against, is only listed in the "
-            "<b>Europe</b> and <b>UK</b> regions. Add one of them in the sidebar.",
-            stamp,
-        )
+        render_page_header("+EV bets", "Prices above Pinnacle's fair odds", s.provider_name)
+        empty_state("Pinnacle, the sharp line these bets are measured against, is only listed in the "
+                    "<b>Europe</b> and <b>UK</b> regions. Add one of them in the sidebar.")
         return
 
     with st.spinner("Comparing prices with Pinnacle…"):
         try:
             ev_results = load_ev_bets(s.provider_name, s.sport_key, s.market, s.region, s.bet_from)
         except Exception as e:
-            render_page_header("+EV bets", "", stamp)
+            render_page_header("+EV bets", "Prices above Pinnacle's fair odds", s.provider_name)
             st.error(f"Couldn't load odds for this sport and market. {e}")
             return
 
     if not ev_results:
-        render_page_header(
-            "+EV bets",
-            "No price beats Pinnacle's fair odds in this sport and market. Pinnacle may not list "
-            "it yet, or the market is very efficient.",
-            stamp,
-        )
+        render_page_header("+EV bets", f"{scope} · prices above Pinnacle's fair odds", s.provider_name)
+        empty_state("No price beats Pinnacle's fair odds here. Pinnacle may not list this market yet, "
+                    "or the market is very efficient.")
         return
 
-    best = ev_results[0]
+    sport = ev_results[0].get("sport") or ""
     render_page_header(
         "+EV bets",
-        f"<b>{len(ev_results)}</b> prices beat Pinnacle's de-vigged fair odds. Best: "
-        f"<b>{escape(format_outcome(best['outcome'], best.get('point')))}</b> at "
-        f"{escape(normalize_book_name(best['bookmaker']))}, {percent(best['ev_pct'])} expected value.",
-        stamp,
+        f"{sport} · {scope} · {len(ev_results)} bets beat Pinnacle's fair odds",
+        s.provider_name,
     )
 
-    with st.container(key="kpis"):
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("+EV bets found", len(ev_results))
-        k2.metric("Best EV", percent(best["ev_pct"]))
-        k3.metric("Average EV", percent(sum(r["ev_pct"] for r in ev_results) / len(ev_results)))
-        k4.metric("Sportsbooks with an edge", len({r["bookmaker"] for r in ev_results}))
+    best = ev_results[0]
+    with st.container(key="card-best"):
+        left, right = st.columns([3, 2], vertical_alignment="center")
+        left.markdown(
+            '<div><div class="hero-label">Best edge</div>'
+            f'<div class="money pos">{percent(best["ev_pct"])}</div>'
+            f'<div class="hero-sub"><b>{escape(format_outcome(best["outcome"], best.get("point")))}</b> at '
+            f'{escape(normalize_book_name(best["bookmaker"]))}, {best["decimal_odds"]:.2f} against a fair '
+            f'{100 / best["true_prob"]:.2f}</div></div>',
+            unsafe_allow_html=True,
+        )
+        right.markdown(facts_html([
+            ("Bets found", str(len(ev_results))),
+            ("Average edge", percent(sum(r["ev_pct"] for r in ev_results) / len(ev_results))),
+            ("Sportsbooks", str(len({r["bookmaker"] for r in ev_results}))),
+        ]), unsafe_allow_html=True)
 
-    slider_col, _ = st.columns([2, 3])
-    min_ev = slider_col.slider("Minimum EV (%)", 0.0, 5.0, 0.5, 0.1)
-    filtered = [r for r in ev_results if r["ev_pct"] >= min_ev]
-
-    section(f"Bets ({len(filtered)})")
-    if not filtered:
-        empty_state(f"No bets at {min_ev:.1f}% EV or more. Lower the minimum to see the rest.")
-        return
-
-    st.dataframe(
-        _table(filtered, s),
-        width="stretch",
-        hide_index=True,
-        column_config={
-            "Game": st.column_config.TextColumn(width="large"),
-            "Decimal": st.column_config.NumberColumn(format="%.3f"),
-            "Fair prob.": st.column_config.NumberColumn(format="%.1f%%"),
-            "EV": st.column_config.NumberColumn(format="+%.2f%%"),
-            "Place bet": st.column_config.LinkColumn(display_text="Open ↗"),
-        },
+    min_ev = st.segmented_control(
+        "Minimum edge", MIN_EV_OPTIONS, default=0.5, key="min_ev",
+        format_func=lambda v: "Any" if v == 0 else f"{v:g}% or more",
     )
-    st.caption("Fair probability is Pinnacle's price with its margin removed. EV is the expected "
-               "return of a $1 bet at the listed price under that probability.")
+    filtered = [r for r in ev_results if r["ev_pct"] >= (min_ev or 0)]
+
+    with st.container(key="card-bets"):
+        st.markdown(card_head("Bets", f"{len(filtered)} shown · best edge first"), unsafe_allow_html=True)
+        if not filtered:
+            empty_state("No bets at this edge. Choose a lower minimum to see the rest.")
+        else:
+            st.markdown('<div class="rows">' + "".join(_row(b) for b in filtered) + "</div>",
+                        unsafe_allow_html=True)
+        st.caption("Fair chance is Pinnacle's price with its margin removed. The edge is the expected "
+                   "return of a $1 bet at the listed price under that chance.")
 
     col, _ = st.columns([1, 2])
     col.download_button(
         "Download +EV bets (CSV)",
         pd.DataFrame(filtered).to_csv(index=False).encode("utf-8"),
-        "ev_bets.csv",
-        "text/csv",
-        width="stretch",
+        "ev_bets.csv", "text/csv", width="stretch",
     )

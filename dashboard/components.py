@@ -1,11 +1,12 @@
 # =============================================================================
 # components.py
-# Presentation helpers: formatting, pills, the title row, cards' inner HTML,
-# the legs table and bookmaker link resolution. Any text that comes from a
-# data provider is HTML-escaped before it is placed inside unsafe_allow_html
-# markup.
+# Presentation helpers: formatting, bookmaker links, and the HTML pieces the
+# views are built from (tiles, the headline money figure, the order ticket,
+# list rows). Any text that comes from a data provider is HTML-escaped
+# before it is placed inside unsafe_allow_html markup.
 # =============================================================================
 
+import zlib
 from datetime import UTC, datetime
 from html import escape
 from urllib.parse import quote_plus
@@ -14,9 +15,17 @@ import pandas as pd
 import streamlit as st
 
 from .config import BOOK_LINKS, MARKET_OPTIONS, NEAR_ARB_THRESHOLD
+from .theme import TILE_TONES
 
-# Stake-split tones: one hue (the accent) at falling strengths, one per leg
-SPLIT_TONES = ["#4a8ad6", "rgba(74,138,214,.6)", "rgba(74,138,214,.32)", "rgba(74,138,214,.18)"]
+# Stake-split tones: the accent at falling strengths, one per leg
+SPLIT_TONES = ["#1d5fd6", "#6f9be6", "#a9c5f1", "#d3e2f8"]
+
+# Short marks for well-known sportsbooks; others use their initials
+BOOK_MARKS = {
+    "Bet365": "365", "Betfair": "BF", "Betsson": "BS", "Pinnacle": "PN", "Betway": "BW",
+    "Marathon Bet": "MB", "DraftKings": "DK", "FanDuel": "FD", "BetMGM": "MGM", "Caesars": "CZ",
+    "William Hill": "WH", "888sport": "888", "Unibet": "UB", "Betano": "BT", "Sportingbet": "SB",
+}
 
 
 # ── Formatting ───────────────────────────────────────────────────────────────
@@ -61,18 +70,23 @@ def format_market_label(market_key: str) -> str:
     return {v: k for k, v in MARKET_OPTIONS.items()}.get(market_key, market_key)
 
 
-def short_game(name: str, limit: int = 28) -> str:
-    """Shorten 'Boston Celtics vs Chicago Bulls' → 'Celtics vs Bulls' for chart labels."""
+def split_teams(game: str) -> list:
     for sep in (" vs ", " @ "):
-        if sep in name:
-            teams = [t.split()[-1] if len(t) > 12 else t for t in name.split(sep)]
-            name = sep.join(teams)
-            break
+        if sep in game:
+            return game.split(sep)
+    return [game]
+
+
+def short_game(name: str, limit: int = 28) -> str:
+    """Shorten 'Boston Celtics vs Chicago Bulls' → 'Celtics vs Bulls'."""
+    teams = split_teams(name)
+    if len(teams) == 2:
+        name = " vs ".join(t.split()[-1] if len(t) > 12 else t for t in teams)
     return name if len(name) <= limit else name[: limit - 1] + "…"
 
 
 def money(value, signed: bool = False) -> str:
-    """$1,234.50 with an optional sign; a grey dash when missing."""
+    """$1,234.50 with an optional sign; a dash when missing."""
     if value is None or pd.isna(value):
         return "—"
     sign = ("+" if value > 0 else "−" if value < 0 else "") if signed else ("−" if value < 0 else "")
@@ -80,7 +94,7 @@ def money(value, signed: bool = False) -> str:
 
 
 def percent(value, signed: bool = True, digits: int = 2) -> str:
-    """+0.46% with its sign; a grey dash when missing."""
+    """+0.46% with its sign; a dash when missing."""
     if value is None or pd.isna(value):
         return "—"
     sign = ("+" if value > 0 else "−" if value < 0 else "") if signed else ""
@@ -93,6 +107,15 @@ def american(odds) -> str:
     except (TypeError, ValueError):
         return "—"
     return f"+{odds}" if odds > 0 else f"−{abs(odds)}"
+
+
+def locked_in_return(implied_sum):
+    """Return (%) from backing every outcome at the best prices, staked to pay the same.
+
+    1 / implied_sum − 1: positive is a guaranteed profit (the arbitrage ROI),
+    negative is the margin the bookmakers keep.
+    """
+    return (1 / implied_sum - 1) * 100
 
 
 # ── Bookmaker links ──────────────────────────────────────────────────────────
@@ -171,19 +194,49 @@ def build_general_odds_info_link(game_name: str) -> str:
     return f"https://www.google.com/search?q={quote_plus(game_name + ' odds')}"
 
 
-def link_html(label: str, url: str | None, detail: str = "") -> str:
-    """A text action that opens in a new tab, or the label in grey if there is no URL.
-
-    `detail` is appended to the label on wider screens only ("Open" + " Betsson").
-    """
-    text = escape(label) + (f'<span class="hide-sm"> {escape(detail)}</span>' if detail else "")
+def open_link(url: str | None, label: str = "Open", primary: bool = False) -> str:
+    """A pill-shaped link that opens in a new tab ('' when there is no URL)."""
     if not url:
-        return f'<span style="color:var(--muted)">{text}</span>'
-    return (f'<a class="go" href="{escape(url)}" target="_blank" rel="noopener noreferrer">'
-            f'{text} ↗</a>')
+        return ""
+    cls = "open primary" if primary else "open"
+    return (f'<a class="{cls}" href="{escape(url)}" target="_blank" rel="noopener noreferrer">'
+            f'{escape(label)} ↗</a>')
 
 
-# ── Pills ────────────────────────────────────────────────────────────────────
+# ── Tiles: a stable pale colour and a short mark for each team and book ──────
+
+def _tone(name: str) -> tuple:
+    return TILE_TONES[zlib.crc32(name.encode("utf-8")) % len(TILE_TONES)]
+
+
+def _initials(name: str) -> str:
+    words = [w for w in name.replace(".", " ").split() if w[:1].isalnum()]
+    if not words:
+        return "?"
+    if len(words) == 1:
+        return words[0][:2].upper()
+    return (words[0][0] + words[-1][0]).upper()
+
+
+def tile(name: str, mark: str | None = None, small: bool = False) -> str:
+    bg, ink = _tone(name)
+    cls = "tile sm" if small else "tile"
+    return (f'<span class="{cls}" style="background:{bg};color:{ink}" '
+            f'aria-hidden="true">{escape(mark or _initials(name))}</span>')
+
+
+def book_tile(book: str, small: bool = False) -> str:
+    name = normalize_book_name(book)
+    return tile(name, BOOK_MARKS.get(name), small)
+
+
+def team_pair(game: str) -> str:
+    """Two overlapping team tiles (or one for a game name that does not split)."""
+    teams = split_teams(game)
+    return '<span class="pair">' + "".join(tile(t.strip()) for t in teams[:2]) + "</span>"
+
+
+# ── Page pieces ──────────────────────────────────────────────────────────────
 
 def pill(text: str, kind: str = "neutral") -> str:
     return f'<span class="pill {kind}">{escape(text)}</span>'
@@ -191,45 +244,35 @@ def pill(text: str, kind: str = "neutral") -> str:
 
 def live_badge(commence_time) -> str:
     """A 'Live' pill if the event has started, else ''."""
-    return pill("Live", "negative") if is_live_event(str(commence_time or "")) else ""
+    return pill("Live", "accent") if is_live_event(str(commence_time or "")) else ""
 
 
 def status_pill(implied_sum: float) -> str:
-    """'Arbitrage' under 1.000, 'Near break-even' under NEAR_ARB_THRESHOLD, else nothing."""
+    """'Guaranteed profit' under 1.000, 'Near break-even' under NEAR_ARB_THRESHOLD, else nothing."""
     if implied_sum < 1.0:
-        return pill("Arbitrage", "positive")
+        return pill("Guaranteed profit", "positive")
     if implied_sum < NEAR_ARB_THRESHOLD:
         return pill("Near break-even", "warning")
     return ""
 
 
-# ── Page structure ───────────────────────────────────────────────────────────
-
-def render_page_header(title: str, finding_html: str = "", stamp_html: str = "") -> None:
-    """The title row: an h1, the screen's finding under it, a freshness stamp on the right.
-
-    `finding_html` and `stamp_html` are trusted markup; escape provider text before passing it.
-    """
+def render_page_header(title: str, sub: str = "", provider_name: str = "") -> None:
+    """The page title, one line about the data under it, and where the data comes from."""
+    source = ""
+    if provider_name:
+        live = provider_name != "demo"
+        source = (f'<div class="source"><span class="dot{" live" if live else ""}"></span>'
+                  f'{"Live odds" if live else "Demo data"}</div>')
     st.markdown(
-        f'<div class="title-row"><div><h1>{escape(title)}</h1>'
-        f'<div class="finding">{finding_html}</div></div>'
-        f'<div class="stamp">{stamp_html}</div></div>',
+        f'<div class="page-head"><div><h1>{escape(title)}</h1>'
+        f'<div class="page-sub">{sub}</div></div>{source}</div>',
         unsafe_allow_html=True,
     )
 
 
-def source_stamp(provider_name: str, cache_seconds: int) -> str:
-    source = "Demo data" if provider_name == "demo" else "Live odds"
-    return f'{pill(source)}<span>Cached for {cache_seconds} s</span>'
-
-
-def section(title: str) -> None:
-    st.markdown(f'<h2 class="section">{escape(title)}</h2>', unsafe_allow_html=True)
-
-
-def card_title(title: str, sub: str = "") -> str:
-    sub_html = f'<div class="card-sub">{escape(sub)}</div>' if sub else ""
-    return f'<div><h3 class="card-title">{escape(title)}</h3>{sub_html}</div>'
+def card_head(title: str, note: str = "") -> str:
+    note_html = f'<span class="card-note">{note}</span>' if note else ""
+    return f'<div class="card-head"><span class="card-title">{escape(title)}</span>{note_html}</div>'
 
 
 def empty_state(html: str) -> None:
@@ -237,74 +280,68 @@ def empty_state(html: str) -> None:
     st.markdown(f'<div class="empty">{html}</div>', unsafe_allow_html=True)
 
 
-def figures_html(figures: list) -> str:
-    """A row of label-over-value figures: [(label, value, css_class, is_lead), ...]."""
-    cells = "".join(
-        f'<div class="figure{" lead" if lead else ""}"><div class="label">{escape(label)}</div>'
-        f'<div class="value {cls}">{value}</div></div>'
-        for label, value, cls, lead in figures
-    )
-    return f'<div class="figure-row">{cells}</div>'
+def money_html(value: float, signed: bool = True, positive: bool = False) -> str:
+    """The headline figure: '+$1' large with '.65' smaller and lighter."""
+    text = money(value, signed=signed)
+    whole, _, cents = text.partition(".")
+    cls = "money pos" if positive else "money"
+    cents_html = f'<span class="cents">.{cents}</span>' if cents else ""
+    return f'<div class="{cls}">{whole}{cents_html}</div>'
 
 
-def game_head_html(name: str, meta: str, pills_html: str = "") -> str:
-    name_html = f'<div class="game-name">{escape(name)}</div>' if name else ""
+def matchup_html(game: str, meta: str, pills_html: str = "") -> str:
     return (
-        f'<div class="game-head"><div>{name_html}'
-        f'<div class="game-meta">{escape(meta)}</div></div>'
-        f'<div class="pills">{pills_html}</div></div>'
+        '<div class="card-head" style="align-items:center">'
+        f'<div class="matchup">{team_pair(game)}<div><div class="matchup-name">{escape(game)}</div>'
+        f'<div class="matchup-meta">{escape(meta)}</div></div></div>'
+        f'<div>{pills_html}</div></div>'
     )
 
 
-# ── Legs: the best price per outcome, its stake and where to place it ────────
+def facts_html(facts: list) -> str:
+    """Small label-over-value facts: [(label, value), ...]."""
+    cells = "".join(f'<div class="fact"><div class="label">{escape(label)}</div>'
+                    f'<div class="value">{value}</div></div>' for label, value in facts)
+    return f'<div class="facts">{cells}</div>'
 
-def legs_table_html(results: list, hide_american: bool = False) -> str:
-    """Table of the best price for every outcome of one game.
 
-    `results` are analysis result dicts (outcome, point, bookmaker, american_odds,
-    decimal_odds, optional stake and link). When stakes are present, each leg's
-    payout and a total row show that every outcome returns the same amount.
+# ── The order ticket: one row per leg, with its stake, payout and link ───────
+
+def ticket_html(results: list, hide_american: bool = False) -> str:
+    """Every outcome's best price as a ticket row.
+
+    With stakes (an arbitrage): "Stake $44.98 · pays $101.65" per leg and a
+    total showing every outcome returns the same. Without: the price alone.
     """
     has_stake = any(r.get("stake") is not None for r in results)
-
-    head = '<th>Outcome</th><th>Sportsbook</th>'
-    if not hide_american:
-        head += '<th class="r hide-sm">American</th>'
-    head += '<th class="r">Decimal</th>'
-    if has_stake:
-        head += '<th class="r">Stake</th><th class="r hide-sm">Returns</th>'
-    head += '<th class="r">Place bet</th>'
-
-    rows = ""
-    total_stake, payouts = 0.0, []
+    rows, total, payouts = "", 0.0, []
     for r in results:
         book = normalize_book_name(r["bookmaker"])
-        cells = (f'<td>{escape(format_outcome(r["outcome"], r.get("point")))}</td>'
-                 f'<td class="sub">{escape(book)}</td>')
+        price = f'{r["decimal_odds"]:.2f}'
         if not hide_american:
-            cells += f'<td class="r hide-sm">{american(r.get("american_odds"))}</td>'
-        cells += f'<td class="r">{r["decimal_odds"]:.3f}</td>'
-        if has_stake:
-            stake = r.get("stake")
-            payout = stake * r["decimal_odds"] if stake is not None else None
-            if stake is not None:
-                total_stake += stake
-                payouts.append(payout)
-            cells += f'<td class="r">{money(stake)}</td><td class="r hide-sm">{money(payout)}</td>'
-        cells += f'<td class="r">{link_html("Open", book_url(r["bookmaker"], r.get("link")), book)}</td>'
-        rows += f"<tr>{cells}</tr>"
-
-    if has_stake and payouts:
-        # One cell per column (including the ones hidden on a phone) keeps the row aligned
+            price += f' ({american(r.get("american_odds"))})'
+        main = escape(format_outcome(r["outcome"], r.get("point")))
+        if has_stake and r.get("stake") is not None:
+            payout = r["stake"] * r["decimal_odds"]
+            total += r["stake"]
+            payouts.append(payout)
+            money_cell = (f'<div class="leg-money"><div class="leg-main">{money(r["stake"])}</div>'
+                          f'<div class="leg-sub">pays {money(payout)}</div></div>')
+        else:
+            money_cell = f'<div class="leg-money"><div class="leg-main">{price.split(" ")[0]}</div></div>'
         rows += (
-            '<tr class="total"><td>Total</td><td></td>'
-            + ('<td class="hide-sm"></td>' if not hide_american else "")
-            + f'<td></td><td class="r">{money(total_stake)}</td>'
-            f'<td class="r hide-sm">{money(min(payouts))}</td><td></td></tr>'
+            f'<div class="leg">{book_tile(book)}'
+            f'<div><div class="leg-main">{main}</div>'
+            f'<div class="leg-sub">{escape(book)} · {price}</div></div>'
+            f'{money_cell}'
+            f'<div class="leg-open">{open_link(book_url(r["bookmaker"], r.get("link")), "Open " + book)}</div>'
+            '</div>'
         )
-
-    return (f'<div class="table-frame"><table class="legs"><thead><tr>{head}</tr></thead>'
-            f'<tbody>{rows}</tbody></table></div>')
+    total_html = ""
+    if payouts:
+        total_html = (f'<div class="ticket-total"><span>You stake <b>{money(total)}</b></span>'
+                      f'<span>Every outcome pays <b>{money(min(payouts))}</b></span></div>')
+    return f'<div class="ticket">{rows}</div>{total_html}'
 
 
 def stake_split_html(results: list) -> str:
@@ -319,6 +356,19 @@ def stake_split_html(results: list) -> str:
         share = r["stake"] / total * 100
         bar += f'<span style="width:{share:.2f}%;background:{tone}"></span>'
         legend += (f'<span><i style="background:{tone}"></i>'
-                   f'{escape(format_outcome(r["outcome"], r.get("point")))} '
-                   f'<span class="num">{share:.1f}%</span></span>')
+                   f'{escape(format_outcome(r["outcome"], r.get("point")))} {share:.0f}%</span>')
     return f'<div><div class="split">{bar}</div><div class="split-legend">{legend}</div></div>'
+
+
+def row_html(lead: str, main: str, sub: str, value_html: str, value_sub: str = "", url: str | None = None) -> str:
+    """A list row: tile, two lines of text, a right-aligned value and an Open link.
+
+    `main`, `sub` and `value_sub` are escaped here; `lead` and `value_html` are trusted markup.
+    """
+    vsub = f'<div class="row-sub">{escape(value_sub)}</div>' if value_sub else ""
+    return (
+        f'<div class="row">{lead}'
+        f'<div><div class="row-main">{escape(main)}</div><div class="row-sub">{escape(sub)}</div></div>'
+        f'<div class="row-end">{value_html}{vsub}</div>'
+        f'<div class="row-open">{open_link(url)}</div></div>'
+    )

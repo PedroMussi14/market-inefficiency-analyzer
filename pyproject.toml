@@ -12,7 +12,6 @@ authors = [{ name = "Pedro Mussi" }]
 requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2,<4",
-    "plotly>=5.20,<8",
     "python-dotenv>=1.0,<2",
     "requests>=2.31,<3",
     "streamlit>=1.50,<2",
@@ -56,6 +55,10 @@ select = [
 ]
 # Nested conditional expressions read worse than a short if/else block.
 ignore = ["SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+# The stylesheet is one long CSS string; its rules read better unwrapped
+"dashboard/theme.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["analyzer", "dashboard", "src", "factories"]
