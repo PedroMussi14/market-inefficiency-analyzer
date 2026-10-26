@@ -4,9 +4,9 @@ Every concrete scraper subclasses `BaseScraper` and implements `scrape()`.
 The base class handles cross-cutting concerns:
 
   - Async HTTP via httpx (with optional proxy)
-  - Headless browser fallback via Playwright (for Cloudflare-protected sites)
-  - User-agent rotation
-  - Per-host rate limiting via Redis
+  - Headless browser rendering via Playwright (for JavaScript-rendered pages)
+  - A realistic browser user agent on every request
+  - Per-scraper rate limiting (minimum interval between requests)
   - Exponential backoff with jitter
   - Structured logging tied to the scraper name
 
