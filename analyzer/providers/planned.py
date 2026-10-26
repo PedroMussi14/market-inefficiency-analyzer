@@ -21,7 +21,7 @@ class OpticOddsProvider(Provider):
     odds endpoint similar to The Odds API's model."""
 
     name        = "opticodds"
-    label       = "OpticOdds 🌎 (planned)"
+    label       = "OpticOdds (planned)"
     region_hint = "350+ books incl. Betano. Adapter not implemented yet."
 
     BASE_URL = "https://api.opticodds.com/api/v3"

@@ -36,8 +36,8 @@ def test_market_scanner_renders_demo_data(app):
     assert not at.exception
     assert widget(at.sidebar.selectbox, "Data provider").value.startswith("Demo data")
     kpis = metrics(at)
-    assert kpis["Games Scanned"] == "8"
-    assert int(kpis["Arbitrage Found"]) >= 1
+    assert kpis["Games scanned"] == "8"
+    assert int(kpis["Guaranteed profits"]) >= 1
 
 
 @pytest.mark.parametrize("market", ["Point Spread", "Game Total"])
@@ -46,11 +46,11 @@ def test_line_markets_render(app, market):
     widget(at.sidebar.selectbox, "Market type").set_value(market).run()
 
     assert not at.exception
-    assert metrics(at)["Games Scanned"] == "8"
+    assert metrics(at)["Games scanned"] == "8"
 
 
 def test_all_arbitrage_hides_unreliable_books(app):
-    at = go_to(app.run(), "⚡ All Arbitrage")
+    at = go_to(app.run(), "All arbitrage")
 
     assert not at.exception
     # Default filter (I bet from: Brasil) → the three Brazil-accessible planted arbs
@@ -59,17 +59,17 @@ def test_all_arbitrage_hides_unreliable_books(app):
 
 
 def test_all_arbitrage_anywhere_includes_us_books(app):
-    at = go_to(app.run(), "⚡ All Arbitrage")
-    widget(at.sidebar.multiselect, "Sportsbook region").set_value(["Brasil 🇧🇷", "United States"]).run()
-    widget(at.sidebar.selectbox, "I bet from").set_value("Anywhere 🌍").run()
+    at = go_to(app.run(), "All arbitrage")
+    widget(at.sidebar.multiselect, "Sportsbook region").set_value(["Brasil", "United States"]).run()
+    widget(at.sidebar.selectbox, "I bet from").set_value("Anywhere").run()
 
     assert not at.exception
     assert metrics(at)["Opportunities"] == "4"   # + the US-only DraftKings/FanDuel arb
 
 
 def test_ev_bets_page_renders(app):
-    at = go_to(app.run(), "📈 +EV Bets")
+    at = go_to(app.run(), "+EV bets")
 
     assert not at.exception
-    assert int(metrics(at)["+EV Bets Found"]) >= 1
+    assert int(metrics(at)["+EV bets found"]) >= 1
     assert "1xBet" not in page_text(at)

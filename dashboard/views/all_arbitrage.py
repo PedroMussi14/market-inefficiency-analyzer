@@ -1,7 +1,10 @@
 # =============================================================================
 # views/all_arbitrage.py
-# Scans every sport at once and lists only guaranteed-profit opportunities.
+# Scans every sport at once and lists only guaranteed-profit opportunities,
+# each with its legs, stakes and booking links.
 # =============================================================================
+
+from html import escape
 
 import pandas as pd
 import streamlit as st
@@ -10,17 +13,23 @@ from analyzer.export import analyses_to_summary_dataframe
 
 from ..components import (
     build_general_odds_info_link,
-    build_prices_table,
-    efficiency_badge,
+    empty_state,
+    figures_html,
     format_market_label,
-    game_card_html,
+    format_start,
+    game_head_html,
+    legs_table_html,
+    link_html,
     live_badge,
-    render_bookmaker_links,
+    money,
+    percent,
     render_page_header,
+    section,
+    source_stamp,
+    stake_split_html,
 )
 from ..data import load_all_arbitrage
 from ..sidebar import Settings
-from ..theme import COLORS
 
 
 def _summary_table(analyses: list) -> pd.DataFrame:
@@ -30,126 +39,107 @@ def _summary_table(analyses: list) -> pd.DataFrame:
         rows.append({
             "Game":        a["event"],
             "Sport":       a["sport"],
-            "Start Time":  a["commence_time"],
-            "ROI (%)":     round(a["roi"], 2) if a.get("roi") else None,
-            "Profit ($)":  round(a["profit"], 2) if a.get("profit") else None,
-            "Efficiency":  round(a["implied_prob_sum"], 4),
+            "Start":       format_start(a["commence_time"]),
+            "Return (%)":  round(a["roi"], 2) if a.get("roi") is not None else None,
+            "Profit ($)":  round(a["profit"], 2) if a.get("profit") is not None else None,
+            "Implied sum": round(a["implied_prob_sum"], 4),
             "Sportsbooks": books,
         })
-    return pd.DataFrame(rows).sort_values("ROI (%)", ascending=False)
+    return pd.DataFrame(rows).sort_values("Return (%)", ascending=False)
 
 
-def _render_game(analysis: dict, s: Settings) -> None:
+def _render_game(i: int, analysis: dict, s: Settings) -> None:
     results = analysis.get("results", [])
-    right = (
-        f'<span style="font-size:0.9rem;font-weight:700;color:{COLORS["arb_green"]};">'
-        f'+{analysis["roi"]:.2f}% ROI</span>'
-        f'<span style="font-size:0.78rem;color:{COLORS["text_muted"]};">'
-        f'Profit: ${analysis["profit"]:.2f}</span>'
-    )
-    st.markdown(
-        game_card_html(
-            label=f'{analysis["sport"]} · {format_market_label(s.market)}',
-            title=analysis["event"],
-            subtitle=str(analysis.get("commence_time", "")),
-            badges_html=live_badge(analysis.get("commence_time")) + efficiency_badge(analysis["implied_prob_sum"]),
-            accent=COLORS["arb_green"],
-            right_html=right,
-        ),
-        unsafe_allow_html=True,
-    )
-
-    col_left, col_right = st.columns([2, 1])
-    with col_left:
-        prices = pd.DataFrame([
-            {
-                "Bet On":            r["outcome"],
-                "Line":              r.get("point"),
-                "Sportsbook":        r["bookmaker"],
-                "American Odds":     r["american_odds"],
-                "Decimal Odds":      r["decimal_odds"],
-                "Suggested Bet ($)": round(r["stake"], 2) if "stake" in r else None,
-                "Direct Link":       r.get("link"),
-            }
-            for r in results
-        ])
-        st.markdown(build_prices_table(prices, s.bankroll, hide_american=s.hide_american_odds),
-                    unsafe_allow_html=True)
-
-    with col_right:
-        st.markdown(
-            '<span class="section-label" style="margin-top:4px;display:block;">Sportsbooks</span>',
-            unsafe_allow_html=True,
-        )
-        render_bookmaker_links({r["bookmaker"]: r.get("link") for r in results})
-        st.markdown("")
-        st.link_button("🔍 Search odds", build_general_odds_info_link(analysis["event"]), width="stretch")
-
-    st.markdown("")
+    meta = " · ".join(filter(None, [
+        analysis.get("sport"), format_market_label(s.market), format_start(analysis.get("commence_time")),
+    ]))
+    with st.container(key=f"card-arb-{i}"):
+        left, right = st.columns([3, 1], gap="medium")
+        with left:
+            st.markdown(game_head_html(analysis["event"], meta, live_badge(analysis.get("commence_time"))),
+                        unsafe_allow_html=True)
+            st.markdown(legs_table_html(results, hide_american=s.hide_american_odds), unsafe_allow_html=True)
+            st.markdown(stake_split_html(results), unsafe_allow_html=True)
+        with right:
+            st.markdown(figures_html([
+                (f"Profit on {money(s.bankroll)}", money(analysis["profit"], signed=True), "pos", True),
+            ]), unsafe_allow_html=True)
+            st.markdown(figures_html([
+                ("Return", percent(analysis["roi"]), "", False),
+                ("Implied sum", f'{analysis["implied_prob_sum"]:.4f}', "", False),
+            ]), unsafe_allow_html=True)
+            odds_link = link_html("Compare odds elsewhere", build_general_odds_info_link(analysis["event"]))
+            st.markdown(f'<div class="links">{odds_link}</div>', unsafe_allow_html=True)
 
 
 def render(s: Settings) -> None:
-    render_page_header(
-        "All Arbitrage", "Cross-Sport",
-        "Every sport scanned simultaneously. Only guaranteed-profit opportunities are shown. "
-        "Cached for 2 minutes — hit Refresh to force a new scan.",
-    )
-
-    with st.spinner("Scanning all sports for arbitrage…"):
+    with st.spinner("Scanning every sport for arbitrage…"):
         arb_all, failed_sports = load_all_arbitrage(
             s.provider_name, s.market, s.region, s.bankroll, s.bet_from,
         )
 
-    if failed_sports:
-        st.caption(f"⚠️ {len(failed_sports)} sport(s) could not be loaded: {', '.join(failed_sports)}")
-
+    stamp = source_stamp(s.provider_name, 120)
     if not arb_all:
-        st.info(
-            "No arbitrage opportunities found across any sport right now. "
-            "Markets are efficient — try a different market type or region."
+        render_page_header(
+            "All arbitrage",
+            "No guaranteed profit in any sport right now. Try another market type or region.",
+            stamp,
         )
+        if failed_sports:
+            st.caption(f"{len(failed_sports)} sport(s) could not be loaded: {', '.join(failed_sports)}")
         return
 
-    # ── KPI strip ────────────────────────────────────────────────────────────
     sports_with_arb = sorted({a["sport"] for a in arb_all if a.get("sport")})
-    ka, kb, kc, kd = st.columns(4)
-    ka.metric("Opportunities",   len(arb_all))
-    kb.metric("Sports Affected", len(sports_with_arb))
-    kc.metric("Best ROI",        f"{max(a['roi'] for a in arb_all):.2f}%")
-    kd.metric("Best Profit",     f"${max(a['profit'] for a in arb_all):.2f}")
-    st.markdown("")
+    best = arb_all[0]
+    render_page_header(
+        "All arbitrage",
+        f"<b>{len(arb_all)}</b> guaranteed profits across {len(sports_with_arb)} sports. "
+        f"Best: <b>{escape(best['event'])}</b>, {money(best['profit'], signed=True)} on {money(s.bankroll)} "
+        f"({percent(best['roi'])}).",
+        stamp,
+    )
 
-    sport_filter = st.multiselect(
-        "Filter by sport", options=sports_with_arb, default=sports_with_arb, key="arb_sport_filter",
+    with st.container(key="kpis"):
+        ka, kb, kc, kd = st.columns(4)
+        ka.metric("Opportunities", len(arb_all))
+        kb.metric("Sports", len(sports_with_arb))
+        kc.metric("Best return", percent(max(a["roi"] for a in arb_all)))
+        kd.metric("Best profit", money(max(a["profit"] for a in arb_all), signed=True))
+
+    if failed_sports:
+        st.caption(f"{len(failed_sports)} sport(s) could not be loaded: {', '.join(failed_sports)}")
+
+    filter_col, _ = st.columns([2, 3])
+    sport_filter = filter_col.multiselect(
+        "Sports", options=sports_with_arb, default=sports_with_arb, key="arb_sport_filter",
     )
     filtered_arb = [a for a in arb_all if a.get("sport") in sport_filter]
-    st.markdown("")
-
     if not filtered_arb:
-        st.info("No opportunities match the selected sports.")
+        empty_state("No opportunities in the selected sports.")
         return
 
-    # ── Summary table + top pick ─────────────────────────────────────────────
-    st.subheader(f"Guaranteed-Profit Games ({len(filtered_arb)})")
-    st.dataframe(_summary_table(filtered_arb), width="stretch", hide_index=True)
-
-    best = filtered_arb[0]
-    st.success(
-        f"⚡ Top pick: **{best['event']}** ({best['sport']}) · "
-        f"ROI **{best['roi']:.2f}%** · Profit **${best['profit']:.2f}**"
+    section(f"Opportunities ({len(filtered_arb)})")
+    st.dataframe(
+        _summary_table(filtered_arb),
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Game": st.column_config.TextColumn(width="large"),
+            "Return (%)": st.column_config.NumberColumn("Return", format="%.2f%%"),
+            "Profit ($)": st.column_config.NumberColumn(
+                "Profit", format="$%.2f", help=f"Guaranteed profit on a ${s.bankroll:,.0f} budget.",
+            ),
+            "Implied sum": st.column_config.NumberColumn(format="%.4f"),
+        },
     )
-    st.markdown("---")
 
-    # ── Per-game cards ───────────────────────────────────────────────────────
-    st.subheader("Game Breakdown")
-    for analysis in filtered_arb:
-        _render_game(analysis, s)
+    section("Stakes and where to place them")
+    for i, analysis in enumerate(filtered_arb):
+        _render_game(i, analysis, s)
 
-    # ── CSV download ─────────────────────────────────────────────────────────
-    st.markdown("---")
-    st.subheader("Download")
-    st.download_button(
-        "↓ Download All Arbitrage (CSV)",
+    col, _ = st.columns([1, 2])
+    col.download_button(
+        "Download opportunities (CSV)",
         analyses_to_summary_dataframe(filtered_arb).to_csv(index=False).encode("utf-8"),
         "all_arbitrage_opportunities.csv",
         "text/csv",

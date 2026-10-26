@@ -1,52 +1,44 @@
 # =============================================================================
 # views/scanner.py
-# Market Scanner: one sport in depth (efficiency ranking, top games,
-# per-game breakdown with charts, stakes and sportsbook links, CSV export).
+# Market Scanner: one sport in depth. The screen answers "is there a
+# guaranteed profit in this market right now, and how do I stake it?":
+# the focus card shows the selected game's legs, stakes and booking links,
+# beside every game's distance from break-even; the full table and CSV
+# exports follow.
 # =============================================================================
+
+from html import escape
 
 import pandas as pd
 import streamlit as st
 
 from analyzer.export import analyses_to_dataframe, analyses_to_summary_dataframe
 
-from ..charts import (
-    chart_efficiency_gauge,
-    chart_efficiency_ranking,
-    chart_odds_comparison,
-    chart_roi_scatter,
-    chart_stake_pie,
-)
+from ..charts import chart_break_even, locked_in_return
 from ..components import (
     build_game_info_link,
     build_general_odds_info_link,
-    build_prices_table,
-    efficiency_badge,
+    card_title,
+    empty_state,
+    figures_html,
     format_market_label,
-    game_card_html,
+    format_start,
+    game_head_html,
+    legs_table_html,
+    link_html,
     live_badge,
-    render_bookmaker_links,
+    money,
+    percent,
     render_page_header,
+    section,
+    source_stamp,
+    stake_split_html,
+    status_pill,
 )
-from ..config import APP_NAME
 from ..data import format_event_detail, load_data
 from ..sidebar import Settings
 
 CHART_CONFIG = {"displayModeBar": False}
-
-SUMMARY_COLUMNS = {
-    "event":              "Game",
-    "sport":              "Sport",
-    "commence_time":      "Start Time",
-    "line":               "Line",
-    "implied_prob_sum":   "Market Efficiency",
-    "arbitrage":          "Guaranteed Profit",
-    "profit":             "Profit ($)",
-    "roi":                "Return (%)",
-    "best_outcome":       "Best Team / Side",
-    "best_bookmaker":     "Best Sportsbook",
-    "best_american_odds": "Best American Odds",
-    "best_decimal_odds":  "Best Decimal Odds",
-}
 
 
 def _apply_filters(event_df: pd.DataFrame, s: Settings) -> pd.DataFrame:
@@ -61,134 +53,145 @@ def _apply_filters(event_df: pd.DataFrame, s: Settings) -> pd.DataFrame:
     return df
 
 
-def _render_kpis(event_df: pd.DataFrame, filtered: pd.DataFrame) -> int:
-    """Render the KPI row and return the number of arbitrage games."""
-    best_efficiency = float(filtered["Market Efficiency"].min()) if not filtered.empty else None
-    arb_count       = int((filtered["Guaranteed Profit"] == "Yes").sum())
-    roi_values      = filtered["Return (%)"].dropna()
-    best_roi        = float(roi_values.max()) if not roi_values.empty else None
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Games Scanned",   len(event_df))
-    c2.metric("Arbitrage Found", arb_count, delta="guaranteed" if arb_count > 0 else None)
-    c3.metric("Best Efficiency", f"{best_efficiency:.4f}" if best_efficiency else "—")
-    c4.metric("Best ROI",        f"{best_roi:.2f}%" if best_roi else "—")
-    st.markdown("")
-    return arb_count
-
-
-def _render_top_games(filtered: pd.DataFrame, arb_df: pd.DataFrame, top_n: int) -> None:
-    st.subheader("Top Games Right Now")
-
-    if arb_df.empty:
-        closest_df = filtered.sort_values("Market Efficiency").head(top_n)
-        if closest_df.empty:
-            st.info("No games match your current filters.")
-        else:
-            st.info("No guaranteed-profit games found. Showing closest opportunities.")
-            st.dataframe(closest_df, width="stretch", hide_index=True)
-    else:
-        top_display_df = arb_df.head(top_n)
-        st.dataframe(top_display_df, width="stretch", hide_index=True)
-
-        best = top_display_df.iloc[0]
-        if pd.notna(best["Return (%)"]) and pd.notna(best["Profit ($)"]):
-            st.success(
-                f"⚡ Best right now: **{best['Game']}** · "
-                f"Return: **{best['Return (%)']:.2f}%** · "
-                f"Profit: **${best['Profit ($)']:.2f}**"
-            )
-    st.markdown("---")
+def _finding(event_df: pd.DataFrame, arb_df: pd.DataFrame, bankroll: float) -> str:
+    """The one line under the title: what in this scan most needs attention."""
+    total = len(event_df)
+    if not arb_df.empty:
+        best = arb_df.iloc[0]
+        count = len(arb_df)
+        return (
+            f"<b>{count} of {total}</b> games guarantee a profit. Best: <b>{escape(best['Game'])}</b>, "
+            f"{money(best['Profit ($)'], signed=True)} on {money(bankroll)} "
+            f"({percent(best['Return (%)'])})."
+        )
+    closest = event_df.sort_values("Market Efficiency").iloc[0]
+    return (
+        f"No guaranteed profit in <b>{total}</b> games. Closest: <b>{escape(closest['Game'])}</b>, "
+        f"{percent(locked_in_return(closest['Market Efficiency']))} backing every outcome."
+    )
 
 
-def _render_breakdown(selected_game: str, summary: pd.Series, event_rows: pd.DataFrame,
-                      analyses: list, s: Settings) -> None:
-    """Per-game charts, best-prices table and sportsbook links."""
-    efficiency = float(summary["Market Efficiency"])
-    profit_val = summary["Profit ($)"]
-    roi_val    = summary["Return (%)"]
+def _render_kpis(event_df: pd.DataFrame, filtered: pd.DataFrame) -> None:
+    arb_count  = int((filtered["Guaranteed Profit"] == "Yes").sum())
+    roi_values = filtered["Return (%)"].dropna()
+    best_eff   = float(filtered["Market Efficiency"].min()) if not filtered.empty else None
 
+    with st.container(key="kpis"):
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Games scanned", len(event_df))
+        c2.metric("Guaranteed profits", arb_count)
+        c3.metric("Best return", percent(float(roi_values.max())) if not roi_values.empty else "—")
+        c4.metric("Lowest implied sum", f"{best_eff:.4f}" if best_eff is not None else "—")
+
+
+def _render_focus(game: str, analysis: dict, s: Settings) -> None:
+    """The selected game: its figures, the legs table and the stake split."""
+    efficiency = analysis["implied_prob_sum"]
+    meta = " · ".join(filter(None, [
+        analysis.get("sport"), format_market_label(s.market), format_start(analysis.get("commence_time")),
+    ]))
+    # The game's name is already in the selector above, so the head carries only its context
     st.markdown(
-        game_card_html(
-            label="Selected Game",
-            title=selected_game,
-            subtitle=f'{summary["Sport"]} · {format_market_label(s.market)}',
-            badges_html=live_badge(summary.get("Start Time")) + efficiency_badge(efficiency),
-        ),
+        game_head_html("", meta, live_badge(analysis.get("commence_time")) + status_pill(efficiency)),
         unsafe_allow_html=True,
     )
 
-    # ── Charts: odds comparison | stake split | efficiency gauge ─────────────
-    ch1, ch2, ch3 = st.columns([2.2, 2.2, 1.6])
-    with ch1:
-        st.plotly_chart(chart_odds_comparison(event_rows, selected_game),
-                        width="stretch", config=CHART_CONFIG)
-    with ch2:
-        pie_fig = chart_stake_pie(event_rows, s.bankroll)
-        if pie_fig:
-            st.plotly_chart(pie_fig, width="stretch", config=CHART_CONFIG)
-        else:
-            st.info("Stake split only shown for arbitrage games.")
-    with ch3:
-        st.plotly_chart(chart_efficiency_gauge(efficiency), width="stretch", config=CHART_CONFIG)
+    if analysis["arbitrage"]:
+        figures = [
+            (f"Guaranteed profit on {money(s.bankroll)}", money(analysis["profit"], signed=True), "pos", True),
+            ("Return", percent(analysis["roi"]), "", False),
+            ("Implied sum", f"{efficiency:.4f}", "", False),
+        ]
+    else:
+        figures = [
+            ("Return backing every outcome", percent(locked_in_return(efficiency)), "", True),
+            ("Implied sum", f"{efficiency:.4f}", "", False),
+        ]
+    st.markdown(figures_html(figures), unsafe_allow_html=True)
 
-    # ── Best prices (left) | links & metrics (right) ─────────────────────────
-    left, right = st.columns([1.5, 1])
-    with left:
-        st.markdown("##### Best Prices")
-        st.markdown(build_prices_table(event_rows, s.bankroll, hide_american=s.hide_american_odds),
-                    unsafe_allow_html=True)
-        st.markdown("")
-        if pd.notna(roi_val):
-            st.success(f"Expected return: **{roi_val:.2f}%** · Estimated profit: **${profit_val:.2f}**")
-        else:
-            st.info("No guaranteed arbitrage opportunity for this game.")
+    st.markdown(legs_table_html(analysis["results"], hide_american=s.hide_american_odds),
+                unsafe_allow_html=True)
+    if analysis["arbitrage"]:
+        st.markdown(stake_split_html(analysis["results"]), unsafe_allow_html=True)
+    else:
+        empty_state("These best prices still leave the bookmakers a margin, so no stake split guarantees "
+                    "a profit. Prices move: refresh to re-check.")
 
-    with right:
-        st.markdown("##### Links & Info")
-        m1, m2 = st.columns(2)
-        m1.metric(f"Profit (${s.bankroll:.0f})", f"${profit_val:.2f}" if pd.notna(profit_val) else "N/A")
-        m2.metric("Return", f"{roi_val:.2f}%" if pd.notna(roi_val) else "N/A")
-
-        st.markdown("")
-        st.link_button("Open matchup news", build_game_info_link(selected_game), width="stretch")
-        st.link_button("Search odds info", build_general_odds_info_link(selected_game), width="stretch")
-
-        st.markdown("")
-        st.markdown('<span class="section-label">Sportsbooks</span>', unsafe_allow_html=True)
-        analysis = next(a for a in analyses if a["event"] == selected_game)
-        render_bookmaker_links({r["bookmaker"]: r.get("link") for r in analysis["results"]})
-
-    st.caption("Direct links are provided by the bookmaker when available.")
+    st.markdown(
+        '<div class="links">'
+        f'{link_html("Matchup news", build_game_info_link(game))}'
+        f'{link_html("Compare odds elsewhere", build_general_odds_info_link(game))}'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 
-def _render_all_results(display_detail_df: pd.DataFrame, s: Settings) -> None:
-    with st.expander("🗂 Show all filtered results"):
+def _render_games_table(filtered: pd.DataFrame, s: Settings) -> None:
+    df = filtered.sort_values("Market Efficiency").copy()
+    df["Start"] = df["Start Time"].map(format_start)
+    df["Locked-in return"] = locked_in_return(df["Market Efficiency"]).round(2)
+    # Profit only exists for arbitrage games: a dash, not "None", elsewhere
+    df["Profit"] = df["Profit ($)"].map(lambda v: money(v, signed=True))
+    columns = ["Game", "Start"]
+    if "Line" in df.columns and s.market != "h2h":
+        columns.append("Line")
+    columns += ["Market Efficiency", "Locked-in return", "Profit"]
+
+    st.dataframe(
+        df[columns],
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Game": st.column_config.TextColumn("Game", width="large"),
+            "Market Efficiency": st.column_config.NumberColumn("Implied sum", format="%.4f"),
+            "Locked-in return": st.column_config.NumberColumn(
+                "Return backing every outcome", format="%+.2f%%",
+                help="Positive: a guaranteed profit. Negative: the margin the bookmakers keep.",
+            ),
+            "Profit": st.column_config.TextColumn(f"Profit on ${s.bankroll:,.0f}", alignment="right"),
+        },
+    )
+
+
+def _render_all_prices(display_detail_df: pd.DataFrame, s: Settings) -> None:
+    with st.expander("Every best price for the filtered games"):
         if display_detail_df.empty:
-            st.info("No results to show.")
+            empty_state("No prices to show for these filters.")
             return
         columns = [
-            "Game", "Sport", "Bet On", "Line", "Sportsbook", "American Odds", "Decimal Odds",
-            "Suggested Bet ($)", "Profit ($)", "Return (%)", "Guaranteed Profit",
+            "Game", "Bet On", "Line", "Sportsbook", "American Odds", "Decimal Odds",
+            "Suggested Bet ($)", "Profit ($)", "Return (%)",
         ]
         if s.hide_american_odds:
             columns.remove("American Odds")
         if s.market == "h2h":
             columns.remove("Line")
         existing = [c for c in columns if c in display_detail_df.columns]
+        df = display_detail_df[existing].sort_values(["Game", "Decimal Odds"], ascending=[True, False])
+        for col in ("Suggested Bet ($)", "Profit ($)"):
+            if col in df.columns:
+                df[col] = df[col].map(money)
+        if "Return (%)" in df.columns:
+            df["Return (%)"] = df["Return (%)"].map(percent)
+        right = dict(alignment="right")
         st.dataframe(
-            display_detail_df[existing].sort_values(["Game", "Decimal Odds"], ascending=[True, False]),
+            df,
             width="stretch",
             hide_index=True,
+            column_config={
+                "Decimal Odds": st.column_config.NumberColumn(format="%.3f"),
+                "Suggested Bet ($)": st.column_config.TextColumn("Stake", **right),
+                "Profit ($)": st.column_config.TextColumn("Profit", **right),
+                "Return (%)": st.column_config.TextColumn("Return", **right),
+            },
         )
 
 
 def _render_downloads(summary_df: pd.DataFrame, detailed_df: pd.DataFrame) -> None:
-    st.subheader("Download Data")
-    col1, col2 = st.columns(2)
+    col1, col2, _ = st.columns([1, 1, 1])
     with col1:
         st.download_button(
-            "↓ Summary CSV",
+            "Download summary (CSV)",
             summary_df.to_csv(index=False).encode("utf-8"),
             "betting_opportunities_summary.csv",
             "text/csv",
@@ -196,7 +199,7 @@ def _render_downloads(summary_df: pd.DataFrame, detailed_df: pd.DataFrame) -> No
         )
     with col2:
         st.download_button(
-            "↓ Detailed CSV",
+            "Download every price (CSV)",
             detailed_df.to_csv(index=False).encode("utf-8"),
             "betting_opportunities_detailed.csv",
             "text/csv",
@@ -206,18 +209,20 @@ def _render_downloads(summary_df: pd.DataFrame, detailed_df: pd.DataFrame) -> No
 
 def render(s: Settings) -> None:
     # ── Data pipeline ────────────────────────────────────────────────────────
-    with st.spinner("Scanning sportsbooks for value…"):
+    with st.spinner("Scanning sportsbooks…"):
         try:
             all_analyses, detail_df, event_df = load_data(
                 s.provider_name, s.sport_key, s.market, s.region, s.bankroll,
                 s.bet_from, s.excluded_books,
             )
         except Exception as e:
-            st.error(f"Error loading odds data: {e}")
+            render_page_header("Market scanner")
+            st.error(f"Couldn't load odds for this sport and market. {e}")
             return
 
     if event_df.empty:
-        st.warning("No games were returned for these settings.")
+        render_page_header("Market scanner", "No games were returned for these settings.",
+                           source_stamp(s.provider_name, 60))
         return
 
     filtered          = _apply_filters(event_df, s)
@@ -226,46 +231,39 @@ def render(s: Settings) -> None:
     filtered_analyses = [a for a in all_analyses if a["event"] in matching_games]
     arb_df = filtered[filtered["Guaranteed Profit"] == "Yes"].sort_values("Return (%)", ascending=False)
 
-    # ── Header + KPIs ────────────────────────────────────────────────────────
-    render_page_header(
-        APP_NAME, "Demo Data" if s.provider_name == "demo" else "Live Odds",
-        "Arbitrage detection across sportsbooks: the best price for every outcome, "
-        "and whether together they guarantee a profit. Data is cached for 60 seconds.",
-    )
-    arb_count = _render_kpis(event_df, filtered)
+    # ── Title row + KPIs ─────────────────────────────────────────────────────
+    render_page_header("Market scanner", _finding(event_df, arb_df, s.bankroll),
+                       source_stamp(s.provider_name, 60))
+    _render_kpis(event_df, filtered)
 
-    # ── Market efficiency charts ─────────────────────────────────────────────
-    with st.expander("📊 Market Efficiency Ranking — all games", expanded=True):
-        st.plotly_chart(chart_efficiency_ranking(event_df, top_n=min(s.top_n, len(event_df))),
+    if not matching_games:
+        empty_state("No games match the current filters. Loosen <b>Max market efficiency</b> or "
+                    "turn off <b>Show only arbitrage</b> in the sidebar.")
+        return
+
+    # ── Focus card (the answer) beside every game's distance to break-even ──
+    # Arbitrage games first, by return; then the closest markets
+    ordered = arb_df["Game"].tolist() + [
+        g for g in filtered.sort_values("Market Efficiency")["Game"] if g not in set(arb_df["Game"])
+    ]
+    left, right = st.columns([7, 5], gap="medium")
+    with left, st.container(key="card-focus"):
+        selected = st.selectbox("Game", ordered, help="Arbitrage games are listed first, best return on top.")
+        analysis = next(a for a in filtered_analyses if a["event"] == selected)
+        _render_focus(selected, analysis, s)
+    with right, st.container(key="card-chart"):
+        st.markdown(card_title(
+            "Return backing every outcome",
+            "At the best prices, staked to pay the same whatever happens. "
+            "Right of the line is a guaranteed profit.",
+        ), unsafe_allow_html=True)
+        st.plotly_chart(chart_break_even(filtered, top_n=s.top_n, selected=selected),
                         width="stretch", config=CHART_CONFIG)
-        if arb_count > 0 and (scatter_fig := chart_roi_scatter(event_df)):
-            st.plotly_chart(scatter_fig, width="stretch", config=CHART_CONFIG)
 
-    _render_top_games(filtered, arb_df, s.top_n)
+    # ── Every game, then every price ─────────────────────────────────────────
+    section(f"All games ({len(filtered)})")
+    _render_games_table(filtered, s)
+    _render_all_prices(display_detail_df, s)
 
     summary_df = analyses_to_summary_dataframe(filtered_analyses)
-    with st.expander("📋 Summary View — all filtered games"):
-        st.dataframe(summary_df.rename(columns=SUMMARY_COLUMNS), width="stretch", hide_index=True)
-
-    # ── Game breakdown ───────────────────────────────────────────────────────
-    st.subheader("Game Breakdown")
-    if matching_games:
-        # Arbitrage games first in the selector, otherwise closest markets first
-        preferred_games = (
-            arb_df["Game"].tolist() if not arb_df.empty
-            else filtered.sort_values("Market Efficiency")["Game"].tolist()
-        )
-        selected_game = st.selectbox("Select a game", preferred_games)
-        _render_breakdown(
-            selected_game,
-            filtered[filtered["Game"] == selected_game].iloc[0],
-            display_detail_df[display_detail_df["Game"] == selected_game],
-            filtered_analyses,
-            s,
-        )
-    else:
-        st.info("No games match the current filters.")
-    st.markdown("---")
-
-    _render_all_results(display_detail_df, s)
     _render_downloads(summary_df, analyses_to_dataframe(filtered_analyses))

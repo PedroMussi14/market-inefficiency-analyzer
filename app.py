@@ -13,10 +13,10 @@ from dashboard.config import APP_NAME
 
 # Page config must be the first Streamlit call of the run
 st.set_page_config(
-    page_title=f"{APP_NAME} · Arbitrage Finder",
-    page_icon="⚡",
+    page_title=APP_NAME,
+    page_icon=":material/query_stats:",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",   # open on desktop, folded away on a phone
 )
 
 from dashboard.sidebar import render_sidebar  # noqa: E402
@@ -24,9 +24,9 @@ from dashboard.theme import inject_css  # noqa: E402
 from dashboard.views import all_arbitrage, ev_bets, scanner  # noqa: E402
 
 VIEWS = {
-    "📊 Market Scanner": scanner.render,
-    "⚡ All Arbitrage":  all_arbitrage.render,
-    "📈 +EV Bets":       ev_bets.render,
+    "Market scanner": scanner.render,
+    "All arbitrage":  all_arbitrage.render,
+    "+EV bets":       ev_bets.render,
 }
 
 inject_css()

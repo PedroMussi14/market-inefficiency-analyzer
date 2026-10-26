@@ -23,7 +23,7 @@ class OddsApiProvider(Provider):
     (Bet365, Betfair, Pinnacle, Betsson, ...)."""
 
     name        = "odds_api"
-    label       = "The Odds API 🌍"
+    label       = "The Odds API"
     region_hint = "Global. Use EU+UK for BR-friendly books."
 
     def __init__(self) -> None:

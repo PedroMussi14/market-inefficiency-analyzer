@@ -23,9 +23,18 @@ from .config import (
     REGION_OPTIONS,
 )
 from .data import load_sports
-from .theme import COLORS
 
-PAGES = ["📊 Market Scanner", "⚡ All Arbitrage", "📈 +EV Bets"]
+PAGES = ["Market scanner", "All arbitrage", "+EV bets"]
+
+# The product's mark: the break-even line, with one price dipping under it
+BRAND_MARK = (
+    '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">'
+    '<rect x="2" y="3" width="4" height="7" fill="#8a8c92"/>'
+    '<rect x="9" y="5" width="4" height="5" fill="#8a8c92"/>'
+    '<rect x="16" y="12" width="4" height="8" fill="#4a8ad6"/>'
+    '<rect x="0" y="10.5" width="22" height="1" fill="#ffffff"/>'
+    '</svg>'
+)
 
 
 @dataclass(frozen=True)
@@ -51,12 +60,16 @@ class Settings:
         return self.provider.name
 
 
+def _group(label: str) -> None:
+    st.markdown(f'<p class="nav-group">{label}</p>', unsafe_allow_html=True)
+
+
 def _select_provider() -> Provider:
     configured = list_configured_providers()
     if not configured:
         st.error("No data providers configured. Add at least one API key to `.env`.")
         for p in list_providers():
-            st.markdown(f"- **{p.label}** — {p.setup_help()}")
+            st.markdown(f"- **{p.label}**: {p.setup_help()}")
         st.stop()
 
     provider_label_to_name = {p.label: p.name for p in configured}
@@ -68,10 +81,9 @@ def _select_provider() -> Provider:
     provider = get_provider(provider_label_to_name[provider_label])
     st.caption(provider.region_hint)
 
-    # Inline expandable hint for unconfigured providers
     unconfigured = [p for p in list_providers() if not p.is_configured()]
     if unconfigured:
-        with st.expander(f"➕ Add more providers ({len(unconfigured)} available)"):
+        with st.expander(f"Other providers ({len(unconfigured)})"):
             for p in unconfigured:
                 st.markdown(f"**{p.label}**")
                 st.caption(p.setup_help())
@@ -82,10 +94,10 @@ def _select_sport(provider: Provider) -> str:
     try:
         available_sports = load_sports(provider.name)
     except NotImplementedError as e:
-        st.error(f"⚠️ {provider.label} adapter is not finished yet:\n\n{e}")
+        st.error(f"The {provider.label} adapter is not finished yet. {e}")
         st.stop()
     except Exception as e:
-        st.error(f"Could not load sports from {provider.label}: {e}")
+        st.error(f"Couldn't load sports from {provider.label}. {e}")
         st.stop()
 
     # Prioritised sport list: common sports first, then everything else
@@ -105,7 +117,7 @@ def _select_region() -> str:
     region_display = st.multiselect(
         "Sportsbook region",
         list(REGION_OPTIONS.keys()),
-        default=["Brasil 🇧🇷"],
+        default=["Brasil"],
         help="Brasil = EU+UK books that accept Brazilian users (Bet365, Betfair, Pinnacle, Betsson).",
     )
     if not region_display:
@@ -118,6 +130,7 @@ def _select_region() -> str:
 
 
 def _render_quota(provider: Provider) -> None:
+    """API credits as a bar at the true ratio, both ends labelled."""
     quota = provider.get_quota_info()
     if quota["remaining"] is None:
         return
@@ -128,19 +141,15 @@ def _render_quota(provider: Provider) -> None:
         return
 
     total = (remaining + used) if used is not None else None
-    pct   = int((remaining / total) * 100) if total else None
-    color = (COLORS["arb_green"] if pct is None or pct > 25 else
-             COLORS["warning"]   if pct > 10 else
-             COLORS["danger"])
-    pct_label = f" ({pct}%)" if pct is not None else ""
+    if not total:
+        st.caption(f"API credits left: {remaining:,}")
+        return
+    share = remaining / total
     st.markdown(
-        f'<div style="margin-top:0.6rem;padding:0.6rem 0.8rem;background:{COLORS["surface2"]};'
-        f'border:1px solid {COLORS["border"]};border-radius:6px;">'
-        f'<span style="font-size:0.62rem;color:{COLORS["text_muted"]};text-transform:uppercase;'
-        f'letter-spacing:0.08em;display:block;margin-bottom:3px;">API Quota</span>'
-        f'<span style="font-size:0.88rem;font-weight:700;color:{color};">'
-        f'{remaining:,} left{pct_label}</span>'
-        f'</div>',
+        '<div class="usage">'
+        f'<div class="row"><span>API credits left</span><span><b>{remaining:,}</b> of {total:,}</span></div>'
+        f'<div class="track"><div class="fill{" low" if share < 0.1 else ""}" '
+        f'style="width:{share * 100:.1f}%"></div></div></div>',
         unsafe_allow_html=True,
     )
 
@@ -148,15 +157,16 @@ def _render_quota(provider: Provider) -> None:
 def render_sidebar() -> Settings:
     """Draw the sidebar and return the user's settings."""
     with st.sidebar:
-        st.markdown(f"## ⚡ {APP_NAME}")
-        st.markdown("---")
+        st.markdown(
+            f'<div class="brand">{BRAND_MARK}<div><div class="brand-name">{APP_NAME}</div>'
+            '<div class="brand-scope">Arbitrage and +EV scanner</div></div></div>',
+            unsafe_allow_html=True,
+        )
 
-        page = st.radio("Page", PAGES, label_visibility="collapsed")
-        st.markdown("---")
+        page = st.radio("Page", PAGES, label_visibility="collapsed", key="nav")
 
+        _group("Market")
         provider = _select_provider()
-        st.markdown("---")
-
         sport_key = _select_sport(provider)
         market    = MARKET_OPTIONS[st.selectbox("Market type", list(MARKET_OPTIONS.keys()))]
         region    = _select_region()
@@ -166,7 +176,7 @@ def render_sidebar() -> Settings:
         bet_from_label = st.selectbox(
             "I bet from",
             list(BET_FROM_OPTIONS.keys()),
-            index=1,   # "Brasil 🇧🇷", matching the default region
+            index=1,   # "Brasil", matching the default region
             help=("Restricts arbs to books you can access from this location. "
                   "Without this, you'll see 'arbs' that span US + BR books which "
                   "require a VPN to execute."),
@@ -177,8 +187,8 @@ def render_sidebar() -> Settings:
         hide_american_odds = bet_from == "brazil"
 
         bankroll = st.number_input("Budget per game ($)", min_value=1.0, value=100.0, step=10.0)
-        st.markdown("---")
 
+        _group("Filters")
         view_mode           = st.radio("View mode", ["Simple", "Advanced"], horizontal=True)
         show_only_arbitrage = st.checkbox("Show only arbitrage opportunities", value=False)
 
@@ -189,7 +199,7 @@ def render_sidebar() -> Settings:
                     "Max market efficiency", 1.00, 1.10, DEFAULT_MAX_EFFICIENCY, 0.001,
                     help="Lower = better value. Arbitrage < 1.000",
                 ),
-                top_n=st.slider("Games to show", 5, 100, 15, 5),
+                top_n=st.slider("Games in the chart", 5, 100, 15, 5),
                 min_roi=st.slider(
                     "Min ROI % (arb only)", 0.0, 5.0, 0.0, 0.1,
                     help="Hide arbitrage opportunities below this return threshold.",
@@ -205,16 +215,15 @@ def render_sidebar() -> Settings:
 
         # Permanent notice: the reliability filter always runs.
         st.caption(
-            "⚠️ Auto-excluding all variants of: "
-            f"{', '.join(sorted(p.title() for p in UNRELIABLE_PATTERNS))} "
-            "(unreliable feed prices)."
+            "Always excluded for unreliable feed prices: "
+            f"{', '.join(sorted(p.title() for p in UNRELIABLE_PATTERNS))}."
         )
 
-        st.markdown("---")
-        if st.button("↻ Refresh data", width="stretch"):
+        _group("Data")
+        if st.button("Refresh odds", width="stretch"):
             st.cache_data.clear()
         auto_refresh = st.toggle(
-            "Auto-refresh (60s)", value=False,
+            "Auto-refresh every 60 s", value=False,
             help="Reload the page every 60 seconds to keep odds fresh.",
         )
         if auto_refresh:

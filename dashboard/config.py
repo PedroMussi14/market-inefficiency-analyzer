@@ -53,7 +53,7 @@ MARKET_OPTIONS = {
 # "Brasil" is a convenience preset for eu+uk: the regions covering the major
 # books that accept Brazilian users (Bet365, Betfair, Pinnacle, Betsson, ...).
 REGION_OPTIONS = {
-    "Brasil 🇧🇷":      "eu,uk",
+    "Brasil":         "eu,uk",
     "United States":  "us",
     "United Kingdom": "uk",
     "Europe":         "eu",
@@ -62,11 +62,11 @@ REGION_OPTIONS = {
 
 # "I bet from…" display label → analyzer.filters.ACCESSIBILITY_PRESETS key
 BET_FROM_OPTIONS = {
-    "Anywhere 🌍":        "anywhere",
-    "Brasil 🇧🇷":          "brazil",
-    "USA 🇺🇸":             "usa",
-    "United Kingdom 🇬🇧":  "uk",
-    "Europe 🇪🇺":          "europe",
+    "Anywhere":       "anywhere",
+    "Brasil":         "brazil",
+    "USA":            "usa",
+    "United Kingdom": "uk",
+    "Europe":         "europe",
 }
 
 # Market efficiency (implied probability sum) below which a market is "near arbitrage"

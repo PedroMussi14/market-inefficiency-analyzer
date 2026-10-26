@@ -80,7 +80,7 @@ class DemoProvider(Provider):
     """Bundled, reproducible sample odds for offline demonstrations."""
 
     name        = "demo"
-    label       = "Demo data 🎓 (offline sample)"
+    label       = "Demo data (offline sample)"
     region_hint = "Bundled sample odds. No API key or internet needed."
 
     def setup_help(self) -> str:

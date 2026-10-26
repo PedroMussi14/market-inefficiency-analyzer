@@ -51,11 +51,14 @@ real but cannot actually be executed.
 <details>
 <summary><b>More screenshots</b></summary>
 
-**All Arbitrage:** every sport scanned at once, with stakes per bookmaker
+**All arbitrage:** every sport scanned at once, with the stake for each bookmaker
 ![All arbitrage view](docs/images/all-arbitrage.png)
 
-**Game breakdown:** odds comparison, stake split and market efficiency gauge
-![Game breakdown](docs/images/game-breakdown.png)
+**+EV bets:** prices above Pinnacle's de-vigged fair odds
+![+EV bets view](docs/images/ev-bets.png)
+
+**On a phone:** the sidebar folds away and the figures regroup
+<img src="docs/images/phone.png" alt="Market scanner on a phone" width="300">
 
 </details>
 
@@ -82,11 +85,11 @@ bookmakers. Try these:
 
 | Where | What you will see |
 |---|---|
-| Market Scanner → NBA | Nuggets @ Lakers: a 1.65% guaranteed profit across Betsson and Bet365 |
+| Market scanner → NBA | Nuggets @ Lakers: a 1.65% guaranteed profit across Betsson and Bet365 |
 | Market type → *Game Total* | Heat @ Knicks: an arbitrage on one totals line while other books post different lines |
-| ⚡ All Arbitrage | Every opportunity across all sports, including a 3-way soccer arb |
+| All arbitrage | Every opportunity across all sports, including a 3-way soccer arb |
 | I bet from → *Anywhere* + region *United States* | A US-only arb appears (DraftKings × FanDuel) |
-| 📈 +EV Bets → Brazil Série A | Prices above Pinnacle's fair odds that are *not* arbitrage |
+| +EV bets → Brazil Série A | Prices above Pinnacle's fair odds that are *not* arbitrage |
 
 The same analysis from the terminal:
 

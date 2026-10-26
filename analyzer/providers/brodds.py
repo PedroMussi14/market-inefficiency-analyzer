@@ -26,7 +26,7 @@ class BroddsLocalProvider(Provider):
     """
 
     name        = "brodds_local"
-    label       = "BrOdds Local 🇧🇷 (self-hosted scrapers)"
+    label       = "BrOdds Local (self-hosted scrapers)"
     region_hint = "Your own scrapers. Native BR books. No quota limits."
 
     @staticmethod

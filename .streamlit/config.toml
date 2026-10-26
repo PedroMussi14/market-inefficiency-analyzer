@@ -1,13 +1,21 @@
 # Streamlit configuration for the dashboard.
-# The custom CSS in dashboard/theme.py is designed for a dark base theme;
+# The custom CSS in dashboard/theme.py is designed for this dark base theme;
 # pinning it here keeps the look identical whatever the OS/browser setting.
+# Colours mirror COLORS in dashboard/theme.py.
 
 [theme]
 base = "dark"
-primaryColor = "#00e5a0"
-backgroundColor = "#0d0f14"
-secondaryBackgroundColor = "#161922"
-textColor = "#e8ecf3"
+primaryColor = "#4a8ad6"
+backgroundColor = "#171719"
+secondaryBackgroundColor = "#212023"
+textColor = "#ffffff"
+borderColor = "#3a3a3e"
+dataframeHeaderBackgroundColor = "#131217"
+baseRadius = "6px"
+
+[theme.sidebar]
+backgroundColor = "#171719"
+secondaryBackgroundColor = "#131217"
 
 [client]
 toolbarMode = "minimal"      # hide developer options such as "Deploy"
