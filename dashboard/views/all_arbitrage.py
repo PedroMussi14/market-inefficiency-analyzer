@@ -11,9 +11,9 @@ from analyzer.export import analyses_to_summary_dataframe
 from ..components import (
     card_head,
     empty_state,
-    facts_html,
     format_market_label,
     format_start,
+    hero_panel_html,
     live_badge,
     matchup_html,
     money,
@@ -78,20 +78,20 @@ def render(s: Settings) -> None:
     # The headline sum: what taking every opportunity shown would lock in
     total_profit = sum(a["profit"] for a in filtered)
     with st.container(key="card-total"):
-        left, right = st.columns([3, 2], vertical_alignment="center")
-        left.markdown(
-            f'<div><div class="hero-label">Guaranteed profit across {len(filtered)} games, '
-            f'{money(s.bankroll)} each</div>{money_html(total_profit, positive=True)}'
-            f'<div class="hero-sub">on <b>{money(s.bankroll * len(filtered))}</b> staked in total</div></div>',
-            unsafe_allow_html=True,
-        )
-        right.markdown(facts_html([
-            ("Best return", percent(max(a["roi"] for a in filtered))),
-            ("Sports", str(len({a["sport"] for a in filtered}))),
-            ("Sportsbooks", str(len({r["bookmaker"] for a in filtered for r in a["results"]}))),
-        ]), unsafe_allow_html=True)
+        st.markdown(card_head("If you take every opportunity", f"{money(s.bankroll)} budget per game",
+                              "spark", ruled=True), unsafe_allow_html=True)
+        st.markdown(hero_panel_html(
+            f'<div class="hero-label">Guaranteed profit across {len(filtered)} games</div>'
+            f'{money_html(total_profit, positive=True)}'
+            f'<div class="hero-sub">on <b>{money(s.bankroll * len(filtered))}</b> staked in total</div>',
+            [
+                ("Best return", percent(max(a["roi"] for a in filtered))),
+                ("Sports", str(len({a["sport"] for a in filtered}))),
+                ("Sportsbooks", str(len({r["bookmaker"] for a in filtered for r in a["results"]}))),
+            ],
+        ), unsafe_allow_html=True)
 
-    st.markdown(card_head("Opportunities", "best return first"), unsafe_allow_html=True)
+    st.markdown(card_head("Opportunities", "best return first", "ticket"), unsafe_allow_html=True)
     for i, analysis in enumerate(filtered):
         _render_ticket(i, analysis, s)
 

@@ -270,9 +270,47 @@ def render_page_header(title: str, sub: str = "", provider_name: str = "") -> No
     )
 
 
-def card_head(title: str, note: str = "") -> str:
+# Outline icons (24px grid, 1.8px stroke) for card headers
+_ICON_PATHS = {
+    "list":   '<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/>'
+              '<circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+    "strip":  '<path d="M3 16h18"/><circle cx="7" cy="16" r="2"/><circle cx="11" cy="16" r="2"/>'
+              '<circle cx="18" cy="16" r="2.5"/><path d="M14.5 5v14"/>',
+    "ticket": '<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a3 3 0 0 0 0 6v2a2 2 0 0 1-2 2H6'
+              'a2 2 0 0 1-2-2v-2a3 3 0 0 0 0-6z"/><path d="M14 5v14" stroke-dasharray="2 2"/>',
+    "spark":  '<path d="M4 17l5-5 4 3 7-8"/><path d="M15 7h5v5"/>',
+    "calc":   '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"/>',
+}
+
+
+def icon(name: str) -> str:
+    return ('<span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{_ICON_PATHS[name]}</svg></span>')
+
+
+def card_head(title: str, note: str = "", icon_name: str | None = None, ruled: bool = False) -> str:
+    """A card's header: an optional icon, the title, a grey note on the right."""
     note_html = f'<span class="card-note">{note}</span>' if note else ""
-    return f'<div class="card-head"><span class="card-title">{escape(title)}</span>{note_html}</div>'
+    icon_html = icon(icon_name) if icon_name else ""
+    cls = "card-head ruled" if ruled else "card-head"
+    return f'<div class="{cls}"><span class="card-title">{icon_html}{escape(title)}</span>{note_html}</div>'
+
+
+def hero_panel_html(figure_html: str, facts: list) -> str:
+    """The tinted headline panel: the big figure on the left, its facts on the right."""
+    cells = "".join(f'<div class="fact"><div class="label">{escape(label)}</div>'
+                    f'<div class="value">{value}</div></div>' for label, value in facts)
+    return f'<div class="hero-panel"><div>{figure_html}</div><div class="facts">{cells}</div></div>'
+
+
+def steps_html(steps: list) -> str:
+    """A worked example as boxes joined by arrows: [(label, value, note, css_class), ...]."""
+    boxes = [
+        f'<div class="step"><div class="label">{escape(label)}</div>'
+        f'<div class="value {cls}">{value}</div><div class="note">{escape(note)}</div></div>'
+        for label, value, note, cls in steps
+    ]
+    return '<div class="steps">' + '<div class="step-arrow">→</div>'.join(boxes) + "</div>"
 
 
 def empty_state(html: str) -> None:
@@ -298,11 +336,11 @@ def matchup_html(game: str, meta: str, pills_html: str = "") -> str:
     )
 
 
-def facts_html(facts: list) -> str:
+def facts_html(facts: list, boxed: bool = False) -> str:
     """Small label-over-value facts: [(label, value), ...]."""
     cells = "".join(f'<div class="fact"><div class="label">{escape(label)}</div>'
                     f'<div class="value">{value}</div></div>' for label, value in facts)
-    return f'<div class="facts">{cells}</div>'
+    return f'<div class="facts{" boxed" if boxed else ""}">{cells}</div>'
 
 
 # ── The order ticket: one row per leg, with its stake, payout and link ───────
@@ -341,7 +379,10 @@ def ticket_html(results: list, hide_american: bool = False) -> str:
     if payouts:
         total_html = (f'<div class="ticket-total"><span>You stake <b>{money(total)}</b></span>'
                       f'<span>Every outcome pays <b>{money(min(payouts))}</b></span></div>')
-    return f'<div class="ticket">{rows}</div>{total_html}'
+    head = ('<div class="ticket-head"><span></span><span>Bet · sportsbook · odds</span>'
+            f'<span class="r">{"Stake · payout" if has_stake else "Best odds"}</span>'
+            '<span class="spacer"></span></div>')
+    return f'<div class="ticket">{head}{rows}</div>{total_html}'
 
 
 def stake_split_html(results: list) -> str:

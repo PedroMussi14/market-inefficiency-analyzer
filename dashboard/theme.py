@@ -12,10 +12,10 @@
 import streamlit as st
 
 COLORS = {
-    "ground":      "#f3f5f7",
+    "ground":      "#eef1f5",
     "surface":     "#ffffff",
-    "raised":      "#f2f8fd",
-    "border":      "#e6e6e6",
+    "raised":      "#f4f8fd",
+    "border":      "#e1e5ea",
     "rule":        "#f0f1f3",
     "control":     "#d6d9dd",
     "text":        "#1b1d1f",
@@ -95,7 +95,7 @@ header[data-testid="stHeader"] {{ background: transparent !important; }}
 
 /* ── Sidebar: on the page ground, a neutral pill on the active item ────── */
 section[data-testid="stSidebar"], section[data-testid="stSidebar"] > div {{
-    background: var(--ground) !important;
+    background: var(--surface) !important;
 }}
 section[data-testid="stSidebar"] {{ border-right: 1px solid var(--border) !important; }}
 section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {{ height: 36px; padding-bottom: 0 !important; }}
@@ -114,23 +114,39 @@ section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{
 .brand-scope {{ font-size: 13px; color: var(--muted); line-height: 17px; }}
 
 .nav-group {{
-    font-size: 13px !important; font-weight: 600; color: var(--text) !important;
-    margin: 20px 0 -4px !important;
+    font-size: 12px !important; font-weight: 700; color: var(--muted) !important;
+    margin: 10px 0 -2px !important; padding-top: 18px; border-top: 1px solid var(--border);
 }}
 
 .st-key-nav, .st-key-nav .stRadio, .st-key-nav [role="radiogroup"],
 .st-key-nav [role="radiogroup"] > div {{ width: 100% !important; }}
 .st-key-nav [role="radiogroup"] {{ gap: 2px !important; }}
 .st-key-nav [data-testid="stRadioOption"] {{
-    margin: 0 !important; padding: 0 10px !important; height: 38px;
+    display: flex !important; align-items: center !important;
+    margin: 0 !important; padding: 0 12px !important; height: 40px;
     border-radius: 10px; cursor: pointer; width: 100%;
     transition: background-color .15s ease;
 }}
-.st-key-nav [data-testid="stRadioOption"]:hover {{ background: #eaedf0; }}
-.st-key-nav [data-testid="stRadioOption"][data-selected="true"] {{ background: #e3e7eb; }}
-.st-key-nav [data-testid="stRadioOption"] p {{ font-size: 15px !important; color: var(--muted) !important; }}
-.st-key-nav [data-testid="stRadioOption"][data-selected="true"] p {{ color: var(--text) !important; font-weight: 600; }}
-.st-key-nav [data-testid="stIconMaterial"] {{ font-size: 18px !important; margin-right: 6px; }}
+.st-key-nav [data-testid="stRadioOption"]:hover {{ background: #f2f4f7; }}
+.st-key-nav [data-testid="stRadioOption"][data-selected="true"] {{ background: var(--accent-soft); }}
+.st-key-nav [data-testid="stRadioOption"] > div,
+.st-key-nav [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] {{ display: flex; align-items: center; }}
+.st-key-nav [data-testid="stRadioOption"] p {{
+    display: flex; align-items: center; gap: 12px; margin: 0 !important;
+    font-size: 15px !important; line-height: 20px !important; color: var(--muted) !important;
+}}
+.st-key-nav [data-testid="stIconMaterial"] {{ font-size: 19px !important; color: var(--muted); }}
+
+/* Sidebar fields: a light grey fill so they stand out on the white panel */
+section[data-testid="stSidebar"] [data-baseweb="select"] > div,
+section[data-testid="stSidebar"] [data-testid="stNumberInputContainer"],
+section[data-testid="stSidebar"] [data-testid="stExpander"] details {{
+    background: #f3f5f8 !important; border: 1px solid var(--border) !important;
+}}
+.st-key-nav [data-testid="stRadioOption"][data-selected="true"] p,
+.st-key-nav [data-testid="stRadioOption"][data-selected="true"] [data-testid="stIconMaterial"] {{
+    color: var(--accent-ink) !important; font-weight: 700;
+}}
 
 /* Radios lose their circles: the page nav, the view mode and the watchlist */
 .st-key-nav [data-testid="stRadioOption"] > div > div:first-child,
@@ -220,8 +236,8 @@ section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{
 
 /* ── Cards: white, one large radius, no shadow ─────────────────────────── */
 [class*="st-key-card"] {{
-    background: var(--surface); border-radius: var(--radius-card);
-    padding: 24px; gap: 16px !important;
+    background: var(--surface); border-radius: var(--radius-card); border: 1px solid var(--border);
+    padding: 22px 24px 24px; gap: 18px !important;
 }}
 [data-testid="stColumn"] > [data-testid="stVerticalBlock"]
     > [data-testid="stLayoutWrapper"]:has(> [class*="st-key-card"]) {{
@@ -231,7 +247,38 @@ section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{
 .card-head {{ display: flex; justify-content: space-between; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; }}
 .links {{ display: flex; gap: 8px; flex-wrap: wrap; }}
 .links a.open {{ background: #eef1f4; }}
-.card-title {{ font-size: 17px; font-weight: 600; color: var(--text); }}
+.card-title {{
+    font-size: 17px; font-weight: 700; color: var(--text); display: inline-flex; align-items: center; gap: 12px;
+}}
+.card-head.ruled {{ padding-bottom: 16px; border-bottom: 1px solid var(--rule); align-items: center; }}
+.ico {{
+    width: 34px; height: 34px; border-radius: 10px; display: inline-grid; place-items: center; flex: none;
+    background: #f2f4f7; color: #3a3d40;
+}}
+.ico svg {{ width: 18px; height: 18px; display: block; }}
+
+/* The headline panel: a tinted block, the figure on the left and its facts on the right */
+.hero-panel {{
+    background: var(--raised); border: 1px solid #e1eaf6; border-radius: 16px; padding: 20px 24px;
+    display: flex; justify-content: space-between; align-items: center; gap: 20px 32px; flex-wrap: wrap;
+}}
+.hero-panel .facts {{ display: flex; gap: 0; }}
+.hero-panel .fact {{ padding: 4px 22px; border-left: 1px solid #d8e3f1; min-width: 96px; }}
+
+/* A worked example: how the headline figure is computed */
+.steps {{ display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }}
+.step {{ flex: 1 1 170px; border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }}
+.step .label {{ font-size: 13px; color: var(--muted); }}
+.step .value {{ font-size: 18px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }}
+.step .value.pos {{ color: var(--positive); }}
+.step .note {{ font-size: 13px; color: var(--muted); margin-top: 2px; }}
+.step-arrow {{ display: grid; place-items: center; color: #9aa1a9; font-size: 18px; }}
+
+/* Key under a chart: each swatch is the mark it explains */
+.key {{ display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--muted); }}
+.key span {{ display: inline-flex; align-items: center; gap: 8px; }}
+.key i {{ width: 10px; height: 10px; border-radius: 50%; display: inline-block; }}
+.key i.ring {{ background: var(--accent); box-shadow: 0 0 0 2px #fff, 0 0 0 5px #d3e2f8; }}
 .card-note {{ font-size: 13px; color: var(--muted); }}
 
 /* The headline figure: dollars large, cents smaller and grey */
@@ -257,10 +304,19 @@ section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{
 .matchup-meta {{ font-size: 13px; color: var(--muted); line-height: 18px; }}
 
 /* The order ticket: one row per leg */
-.ticket {{ background: var(--ground); border-radius: 14px; padding: 4px 16px; }}
+.ticket {{ background: #f7f9fb; border: 1px solid var(--border); border-radius: 14px; padding: 0 16px 2px; }}
+.ticket-head {{
+    display: grid; grid-template-columns: 40px 1fr auto auto; gap: 14px; padding: 12px 0 10px;
+    font-size: 12px; font-weight: 700; color: var(--muted); border-bottom: 1px solid #e4e7ea;
+}}
+.ticket-head .r {{ text-align: right; }}
+/* Fixed widths so every row's figures line up under the column labels */
+.ticket-head .spacer, .leg-open {{ width: 176px; display: flex; justify-content: flex-end; }}
+.ticket-head .r, .leg-money {{ min-width: 120px; }}
 .leg {{ display: grid; grid-template-columns: 40px 1fr auto auto; gap: 14px; align-items: center;
         min-height: 72px; }}
 .leg + .leg {{ border-top: 1px solid #e4e7ea; }}
+.leg a.open {{ border: 1px solid var(--border); }}
 .leg-main {{ font-size: 15px; font-weight: 600; line-height: 20px; }}
 .leg-sub {{ font-size: 13px; color: var(--muted); line-height: 18px; font-variant-numeric: tabular-nums; }}
 .leg-money {{ text-align: right; font-variant-numeric: tabular-nums; }}
@@ -274,7 +330,7 @@ a.open {{
 a.open:hover {{ background: var(--accent-soft); color: var(--accent-ink) !important; }}
 a.open.primary {{ background: var(--accent); color: #fff !important; }}
 a.open.primary:hover {{ background: #174fb5; color: #fff !important; }}
-.ticket-total {{ display: flex; justify-content: space-between; padding: 14px 4px 0; font-size: 15px;
+.ticket-total {{ display: flex; justify-content: space-between; padding: 0 4px; font-size: 15px;
                  font-variant-numeric: tabular-nums; }}
 .ticket-total span:first-child {{ color: var(--muted); }}
 .ticket-total b {{ font-weight: 600; }}
@@ -287,6 +343,9 @@ a.open.primary:hover {{ background: #174fb5; color: #fff !important; }}
 
 /* Facts: small label over value, inside a card */
 .facts {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; }}
+.facts.boxed {{ gap: 0; border: 1px solid var(--border); border-radius: 14px; }}
+.facts.boxed .fact {{ padding: 14px 18px; }}
+.facts.boxed .fact + .fact {{ border-left: 1px solid var(--border); }}
 .fact .label {{ font-size: 13px; color: var(--muted); }}
 .fact .value {{ font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }}
 
@@ -303,7 +362,7 @@ a.open.primary:hover {{ background: #174fb5; color: #fff !important; }}
 
 /* ── Watchlist: a radio whose options are list rows ────────────────────── */
 .st-key-watch, .st-key-watch .stRadio, .st-key-watch [role="radiogroup"] {{ width: 100% !important; }}
-.st-key-watch [role="radiogroup"] {{ gap: 2px !important; max-height: 456px; overflow-y: auto; }}
+.st-key-watch [role="radiogroup"] {{ gap: 2px !important; max-height: 620px; overflow-y: auto; }}
 .st-key-watch [role="radiogroup"] > div {{
     padding: 12px 14px; border-radius: 14px; cursor: pointer; width: 100%;
     transition: background-color .15s ease;
@@ -336,7 +395,7 @@ a.open.primary:hover {{ background: #174fb5; color: #fff !important; }}
 .strip text {{ font-family: var(--font); }}
 
 /* ── Rows (EV bets, opportunities) ─────────────────────────────────────── */
-.rows {{ display: flex; flex-direction: column; }}
+.rows {{ display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 14px; padding: 0 16px; }}
 .row {{ display: grid; grid-template-columns: 40px 1fr auto auto; gap: 14px; align-items: center; min-height: 76px; }}
 .row + .row {{ border-top: 1px solid var(--rule); }}
 .row-main {{ font-size: 15px; font-weight: 600; line-height: 20px; }}
@@ -386,10 +445,20 @@ a.open.primary:hover {{ background: #174fb5; color: #fff !important; }}
     .ticket {{ padding: 4px 12px; }}
     .leg {{ grid-template-columns: 32px 1fr auto; gap: 10px; }}
     .leg .tile {{ width: 32px; height: 32px; border-radius: 10px; font-size: 12px; }}
-    .leg .leg-open {{ grid-column: 2 / -1; padding-bottom: 12px; }}
+    .leg .leg-open {{ grid-column: 2 / -1; padding-bottom: 12px; width: auto; justify-content: flex-start; }}
+    .leg-money {{ min-width: 0; }}
     .row {{ grid-template-columns: 32px 1fr auto; gap: 10px; }}
     .row .tile {{ width: 32px; height: 32px; border-radius: 10px; font-size: 12px; }}
     .row .row-open {{ display: none; }}
+    .hero-panel {{ padding: 16px; }}
+    .hero-panel .facts {{ width: 100%; }}
+    .hero-panel .fact {{ flex: 1; padding: 4px 10px; }}
+    .hero-panel .fact:first-child {{ border-left: 0; padding-left: 0; }}
+    .ticket-head {{ display: none; }}
+    .facts.boxed {{ grid-template-columns: 1fr 1fr; }}
+    .facts.boxed .fact:nth-child(3) {{ border-left: 0; }}
+    .facts.boxed .fact:nth-child(n+3) {{ border-top: 1px solid var(--border); }}
+    .step-arrow {{ display: none; }}
 }}
 
 @media (prefers-reduced-motion: reduce) {{ * {{ transition: none !important; }} }}

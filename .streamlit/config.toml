@@ -6,15 +6,15 @@
 [theme]
 base = "light"
 primaryColor = "#1d5fd6"
-backgroundColor = "#f3f5f7"
+backgroundColor = "#eef1f5"
 secondaryBackgroundColor = "#ffffff"
 textColor = "#1b1d1f"
 borderColor = "#d6d9dd"
 baseRadius = "10px"
 
 [theme.sidebar]
-backgroundColor = "#f3f5f7"
-secondaryBackgroundColor = "#ffffff"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f5f8"   # field fill on the white sidebar
 
 [client]
 toolbarMode = "minimal"      # hide developer options such as "Deploy"

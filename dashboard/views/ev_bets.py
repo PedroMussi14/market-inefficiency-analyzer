@@ -14,14 +14,15 @@ from ..components import (
     book_url,
     card_head,
     empty_state,
-    facts_html,
     format_market_label,
     format_outcome,
     format_start,
+    hero_panel_html,
     normalize_book_name,
     percent,
     render_page_header,
     row_html,
+    steps_html,
 )
 from ..data import load_ev_bets
 from ..sidebar import Settings
@@ -73,20 +74,30 @@ def render(s: Settings) -> None:
     )
 
     best = ev_results[0]
+    outcome = escape(format_outcome(best["outcome"], best.get("point")))
+    book = escape(normalize_book_name(best["bookmaker"]))
+    fair_odds = 100 / best["true_prob"]
     with st.container(key="card-best"):
-        left, right = st.columns([3, 2], vertical_alignment="center")
-        left.markdown(
-            '<div><div class="hero-label">Best edge</div>'
+        st.markdown(card_head("Best bet right now", escape(best["event"]), "spark", ruled=True),
+                    unsafe_allow_html=True)
+        st.markdown(hero_panel_html(
+            '<div class="hero-label">Best edge</div>'
             f'<div class="money pos">{percent(best["ev_pct"])}</div>'
-            f'<div class="hero-sub"><b>{escape(format_outcome(best["outcome"], best.get("point")))}</b> at '
-            f'{escape(normalize_book_name(best["bookmaker"]))}, {best["decimal_odds"]:.2f} against a fair '
-            f'{100 / best["true_prob"]:.2f}</div></div>',
-            unsafe_allow_html=True,
-        )
-        right.markdown(facts_html([
-            ("Bets found", str(len(ev_results))),
-            ("Average edge", percent(sum(r["ev_pct"] for r in ev_results) / len(ev_results))),
-            ("Sportsbooks", str(len({r["bookmaker"] for r in ev_results}))),
+            f'<div class="hero-sub"><b>{outcome}</b> at {book}</div>',
+            [
+                ("Bets found", str(len(ev_results))),
+                ("Average edge", percent(sum(r["ev_pct"] for r in ev_results) / len(ev_results))),
+                ("Sportsbooks", str(len({r["bookmaker"] for r in ev_results}))),
+            ],
+        ), unsafe_allow_html=True)
+        # The worked example: how that edge is computed
+        st.markdown(card_head("How the edge is calculated", "", "calc"), unsafe_allow_html=True)
+        st.markdown(steps_html([
+            ("Pinnacle, margin removed", f'{best["true_prob"]:.1f}%', f"fair chance · fair odds {fair_odds:.2f}", ""),
+            (f"{normalize_book_name(best['bookmaker'])} offers", f'{best["decimal_odds"]:.2f}',
+             f"{(best['decimal_odds'] / fair_odds - 1) * 100:.1f}% above the fair odds", ""),
+            ("Expected return per $1", percent(best["ev_pct"]),
+             f'{best["decimal_odds"]:.2f} × {best["true_prob"] / 100:.3f} − 1', "pos"),
         ]), unsafe_allow_html=True)
 
     min_ev = st.segmented_control(
@@ -96,7 +107,8 @@ def render(s: Settings) -> None:
     filtered = [r for r in ev_results if r["ev_pct"] >= (min_ev or 0)]
 
     with st.container(key="card-bets"):
-        st.markdown(card_head("Bets", f"{len(filtered)} shown · best edge first"), unsafe_allow_html=True)
+        st.markdown(card_head("Bets", f"{len(filtered)} shown · best edge first", "list", ruled=True),
+                    unsafe_allow_html=True)
         if not filtered:
             empty_state("No bets at this edge. Choose a lower minimum to see the rest.")
         else:

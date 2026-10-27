@@ -22,6 +22,7 @@ from ..components import (
     facts_html,
     format_market_label,
     format_start,
+    hero_panel_html,
     live_badge,
     locked_in_return,
     matchup_html,
@@ -58,25 +59,24 @@ def _render_hero(game: str, analysis: dict, s: Settings) -> None:
         analysis.get("sport"), format_market_label(s.market), format_start(analysis.get("commence_time")),
     ]))
 
-    if analysis["arbitrage"]:
-        st.markdown(
-            f'<div><div class="hero-label">Guaranteed profit on {money(s.bankroll)}</div>'
-            f'{money_html(analysis["profit"], positive=True)}'
-            f'<div class="hero-sub"><b>{percent(analysis["roi"])}</b> return, whatever the result</div></div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f'<div><div class="hero-label">Return backing every outcome</div>'
-            f'<div class="money">{percent(locked_in_return(efficiency))}</div>'
-            '<div class="hero-sub">The best prices still leave the bookmakers a margin.</div></div>',
-            unsafe_allow_html=True,
-        )
-
     st.markdown(
         matchup_html(game, meta, live_badge(analysis.get("commence_time")) + status_pill(efficiency)),
         unsafe_allow_html=True,
     )
+
+    if analysis["arbitrage"]:
+        figure = (f'<div class="hero-label">Guaranteed profit on {money(s.bankroll)}</div>'
+                  f'{money_html(analysis["profit"], positive=True)}'
+                  '<div class="hero-sub">whatever the result</div>')
+        facts = [("Return", percent(analysis["roi"])), ("Implied sum", f"{efficiency:.4f}"),
+                 ("Legs", str(len(analysis["results"])))]
+    else:
+        figure = ('<div class="hero-label">Return backing every outcome</div>'
+                  f'<div class="money">{percent(locked_in_return(efficiency))}</div>'
+                  '<div class="hero-sub">the bookmakers still keep a margin</div>')
+        facts = [("Implied sum", f"{efficiency:.4f}"), ("Budget", money(s.bankroll)),
+                 ("Legs", str(len(analysis["results"])))]
+    st.markdown(hero_panel_html(figure, facts), unsafe_allow_html=True)
     st.markdown(ticket_html(analysis["results"], hide_american=s.hide_american_odds), unsafe_allow_html=True)
     if analysis["arbitrage"]:
         st.markdown(stake_split_html(analysis["results"]), unsafe_allow_html=True)
@@ -153,26 +153,36 @@ def render(s: Settings) -> None:
 
     left, right = st.columns([7, 5], gap="medium")
     with right, st.container(key="card-watch"):
-        st.markdown(card_head("Games", f"{len(ordered)} shown · best first"), unsafe_allow_html=True)
+        st.markdown(card_head("Games", f"{len(ordered)} · best first", "list", ruled=True),
+                    unsafe_allow_html=True)
         selected = st.radio(
             "Game", list(labels), format_func=labels.get, captions=captions,
             label_visibility="collapsed", key="watch",
         )
     with left, st.container(key="card-hero"):
+        st.markdown(card_head("Selected game", "stakes sized to pay the same on every outcome", "ticket",
+                              ruled=True), unsafe_allow_html=True)
         analysis = next(a for a in filtered_analyses if a["event"] == selected)
         _render_hero(selected, analysis, s)
 
     with st.container(key="card-market"):
         st.markdown(card_head("Where every game sits",
-                              "Return from backing every outcome at the best prices"),
+                              "return from backing every outcome at the best prices", "strip", ruled=True),
                     unsafe_allow_html=True)
         st.markdown(market_strip_svg(filtered, selected), unsafe_allow_html=True)
+        st.markdown(
+            '<div class="key"><span><i style="background:#1d5fd6"></i>Guaranteed profit</span>'
+            '<span><i style="background:#c4c8cd"></i>Bookmakers keep a margin</span>'
+            '<span><i class="ring"></i>Selected game</span>'
+            '<span>Dots stacked vertically share the same return</span></div>',
+            unsafe_allow_html=True,
+        )
         roi = arb_df["Return (%)"].dropna()
         st.markdown(facts_html([
             ("Games scanned", str(len(event_df))),
             ("Guaranteed profits", str(len(arb_df))),
             ("Best return", percent(float(roi.max())) if not roi.empty else "—"),
             ("Lowest implied sum", f'{filtered["Market Efficiency"].min():.4f}'),
-        ]), unsafe_allow_html=True)
+        ], boxed=True), unsafe_allow_html=True)
 
     _render_downloads(filtered_analyses)
