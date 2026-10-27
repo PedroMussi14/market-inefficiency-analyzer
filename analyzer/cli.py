@@ -37,6 +37,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="only use books accessible from this location (default: %(default)s)")
     parser.add_argument("--include-unreliable", action="store_true",
                         help="keep books with known unreliable feed prices (e.g. 1xBet)")
+    parser.add_argument("--include-live", action="store_true",
+                        help="keep games already in progress (their in-play prices are not comparable)")
     parser.add_argument("--bankroll", type=float, default=100.0,
                         help="total stake per event used for stake sizing (default: %(default)s)")
     parser.add_argument("--top", type=int, default=5,
@@ -90,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         provider.get_odds(sport=args.sport, markets=args.market, regions=args.regions),
         bet_from=args.bet_from,
         include_unreliable=args.include_unreliable,
+        include_started=args.include_live,
     )
     analyses = [
         analysis

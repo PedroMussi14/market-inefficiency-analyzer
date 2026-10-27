@@ -194,5 +194,10 @@ These are documented rather than hidden, and several are on the roadmap:
   which reduces the effective price. Not yet modelled.
 - **Stale prices.** Each bookmaker reports a `last_update` time; flagging old
   prices is planned.
+- **Games in progress.** In-play prices change by the second and each
+  bookmaker's quote is captured at a different moment, so comparing them
+  produces large "arbitrage" (30%+) that no longer exists. Games that have
+  started are therefore excluded before analysis (`--include-live` in the CLI
+  keeps them).
 - **Rounding.** Bookmakers round stakes and odds. A 0.3% arbitrage can
   disappear after rounding stakes to whole currency units.

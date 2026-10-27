@@ -45,7 +45,7 @@ real but cannot actually be executed.
 - **Pluggable data providers:** The Odds API, a self-hosted scraper service for
   Brazilian books ([BrOdds](brodds-api/)), and an **offline demo dataset**, so
   everything runs with no API key and no internet.
-- **Tested:** 76 automated tests, including end-to-end tests that drive the real
+- **Tested:** 79 automated tests, including end-to-end tests that drive the real
   dashboard, run on Python 3.11–3.13 in CI.
 
 <details>
@@ -180,7 +180,7 @@ logic powers the dashboard, the CLI and the tests. Design decisions are covered 
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                      # analyzer + dashboard (73 tests)
+pytest                      # analyzer + dashboard (76 tests)
 ruff check .                # lint
 cd brodds-api && pytest     # scraper service (3 tests, own dependencies)
 ```

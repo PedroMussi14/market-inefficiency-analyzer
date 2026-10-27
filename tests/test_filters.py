@@ -48,3 +48,12 @@ def test_prepare_events_does_not_mutate_input():
     event = make_event([book("1xBet")])
     prepare_events([event])
     assert titles([event]) == ["1xBet"]
+
+
+def test_games_in_progress_are_dropped_by_default():
+    upcoming = make_event([book("Pinnacle")])
+    started = make_event([book("Pinnacle")])
+    started["commence_time"] = "2020-01-01T00:00:00Z"
+
+    assert prepare_events([upcoming, started]) == [upcoming]
+    assert len(prepare_events([upcoming, started], include_started=True)) == 2

@@ -32,7 +32,7 @@ def test_market_scanner_renders_demo_data(app):
     assert not at.exception
     assert widget(at.sidebar.selectbox, "Data provider").value.startswith("Demo data")
     games = at.radio(key="watch")
-    assert len(games.options) == 8
+    assert len(games.options) == 7   # 8 demo NBA games, one already in progress
     assert "Guaranteed profit on" in page_text(at)   # the demo NBA slate has an arbitrage
 
 
@@ -42,7 +42,7 @@ def test_line_markets_render(app, market):
     widget(at.sidebar.selectbox, "Market type").set_value(market).run()
 
     assert not at.exception
-    assert len(at.radio(key="watch").options) == 8
+    assert len(at.radio(key="watch").options) == 7
 
 
 def test_all_arbitrage_hides_unreliable_books(app):

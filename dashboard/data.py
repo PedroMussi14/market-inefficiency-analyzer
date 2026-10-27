@@ -72,10 +72,7 @@ def load_data(
     Returns:
         (all_analyses, detail_df, event_df)
     """
-    try:
-        events = _fetch_events(provider_name, sport_key, market, region, bet_from, excluded_books)
-    except Exception as e:
-        raise RuntimeError(f"This sport or market is not supported right now. Details: {e}") from e
+    events = _fetch_events(provider_name, sport_key, market, region, bet_from, excluded_books)
 
     all_analyses = _analyse(events, bankroll, market)
 
@@ -92,7 +89,9 @@ def load_all_arbitrage(provider_name: str, market: str, region: str, bankroll: f
     """Scan every available sport in parallel and keep only arbitrage results.
 
     Returns:
-        (arbitrage_analyses sorted by ROI, list of sport keys that failed to load)
+        (arbitrage_analyses sorted by ROI,
+         sorted sport keys that failed to load,
+         the first failure's message, or "" when every sport loaded)
     """
     sports = load_sports(provider_name)
 
@@ -100,16 +99,20 @@ def load_all_arbitrage(provider_name: str, market: str, region: str, bankroll: f
         events = _fetch_events(provider_name, sport_key, market, region, bet_from)
         return [a for a in _analyse(events, bankroll, market) if a["arbitrage"]]
 
-    found, failed = [], []
+    found, failed, reasons = [], [], []
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(scan, key): key for key in sports.values()}
         for future in as_completed(futures):
             try:
                 found.extend(future.result())
-            except Exception:
+            except Exception as e:
                 failed.append(futures[future])
+                reasons.append(e)
 
-    return sorted(found, key=lambda a: a.get("roi") or 0, reverse=True), sorted(failed)
+    # A spent quota explains every other failure, so report it first
+    reasons.sort(key=lambda e: not getattr(e, "quota_exhausted", False))
+    reason = str(reasons[0]) if reasons else ""
+    return sorted(found, key=lambda a: a.get("roi") or 0, reverse=True), sorted(failed), reason
 
 
 @st.cache_data(ttl=60)

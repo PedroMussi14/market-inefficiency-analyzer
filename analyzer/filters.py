@@ -2,10 +2,12 @@
 # filters.py
 # Bookmaker filtering applied to events BEFORE arbitrage / +EV analysis.
 #
-# Two filters, applied in this order by `prepare_events`:
-#   1. Accessibility ("I bet from…"): keep only books you can actually use
+# Three filters, applied in this order by `prepare_events`:
+#   1. Timing: drop games already in progress, whose in-play prices are
+#      captured at different moments by each book and cannot be compared.
+#   2. Accessibility ("I bet from…"): keep only books you can actually use
 #      from one location. An arbitrage is only real if every leg can be placed.
-#   2. Reliability: always drop books whose API prices are known to differ from
+#   3. Reliability: always drop books whose API prices are known to differ from
 #      what users actually see, plus any books the user excludes by name.
 #
 # Matching is done on a normalised form of the bookmaker's key and title
@@ -14,6 +16,7 @@
 # =============================================================================
 
 import re
+from datetime import UTC, datetime
 
 # "I bet from…" presets: substring patterns matched against bookmaker names.
 # None disables the filter.
@@ -72,20 +75,38 @@ def _filter_bookmakers(events: list, keep) -> list:
     ]
 
 
+def has_started(event: dict, now: datetime | None = None) -> bool:
+    """True when the event's start time has passed (the game is in progress)."""
+    try:
+        start = datetime.fromisoformat(str(event.get("commence_time", "")).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return start <= (now or datetime.now(UTC))
+
+
 def prepare_events(
     events: list,
     bet_from: str = "anywhere",
     excluded_titles: frozenset = frozenset(),
     include_unreliable: bool = False,
+    include_started: bool = False,
 ) -> list:
-    """Apply the accessibility, reliability and exclusion filters to events.
+    """Apply the timing, accessibility, reliability and exclusion filters to events.
+
+    Games already in progress are dropped by default: in-play prices move by
+    the second and each bookmaker's quote is captured at a different moment,
+    so comparing them produces "arbitrage" that no longer exists.
 
     Args:
         events:             canonical events from a provider
         bet_from:           key of ACCESSIBILITY_PRESETS
         excluded_titles:    exact bookmaker titles to drop
         include_unreliable: keep UNRELIABLE_PATTERNS books (off by default)
+        include_started:    keep games already in progress (off by default)
     """
+    if not include_started:
+        now = datetime.now(UTC)
+        events = [e for e in events if not has_started(e, now)]
     accessible = ACCESSIBILITY_PRESETS[bet_from]
 
     def keep(book: dict) -> bool:
